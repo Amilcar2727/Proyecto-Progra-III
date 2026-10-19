@@ -108,12 +108,16 @@ class TabDyV(ttk.Frame):
         except ValueError:
             k = 5
 
-        zonas, ruta_global = resolver_rutas_dyv(
-            nodo_inicio_id=origen_id,
-            pedidos=self.pedidos,
-            grafo=self.grafo,
-            umbral_k=k,
-        )
+        try:
+            zonas, ruta_global = resolver_rutas_dyv(
+                nodo_inicio_id=origen_id,
+                pedidos=self.pedidos,
+                grafo=self.grafo,
+                umbral_k=k,
+            )
+        except ValueError as error:
+            messagebox.showerror("Ruta no disponible", str(error))
+            return
 
         # Dibujar en mapa
         self.componente_mapa.dibujar_grafo()
@@ -138,7 +142,7 @@ class TabDyV(ttk.Frame):
         self.txt_zonas.delete("1.0", tk.END)
         self.txt_zonas.insert(tk.END, "=== RESULTADOS DIVIDE & VENCERÁS ===\n")
         self.txt_zonas.insert(tk.END, f"Zonas generadas: {len(zonas)} (K ≤ {k})\n")
-        self.txt_zonas.insert(tk.END, f"Distancia total: {ruta_global.distancia_total_m:,.2f} m\n")
+        self.txt_zonas.insert(tk.END, f"Distancia total por calles: {ruta_global.distancia_total_m:,.2f} m\n")
         self.txt_zonas.insert(tk.END, f"Tiempo de partición y ensamble: {ruta_global.tiempo_computo_ms:.3f} ms\n\n")
 
         for z in enumerate(zonas):

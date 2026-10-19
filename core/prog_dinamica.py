@@ -8,8 +8,9 @@ Prohibido el uso de librerías externas de optimización o itertools.
 """
 
 import time
-from typing import Dict, List, Optional, Tuple
-from core.geo import distancia_haversine
+import math
+from typing import List, Optional, Tuple
+from core.grafo import validar_distancias
 from core.modelos import Pedido, Ruta
 
 
@@ -86,7 +87,7 @@ def resolver_mochila_01(
 
 
 def held_karp_tsp(
-    coordenadas: List[Tuple[float, float]],
+    matriz_distancias: List[List[float]],
     nombres: Optional[List[str]] = None,
     retornar_al_inicio: bool = True,
 ) -> Tuple[List[int], float, float]:
@@ -115,26 +116,19 @@ def held_karp_tsp(
     Complejidad Espacial:
       - O(n · 2ⁿ) para la tabla de memoización memo[mask][u].
 
-    :param coordenadas: Lista de puntos (lat, lon).
+    :param matriz_distancias: Matriz dirigida de distancias mínimas por calles.
     :param nombres: Etiquetas opcionales de los puntos.
     :param retornar_al_inicio: Si es True, incluye el retorno al origen (TSP clásico).
     :return: Tupla con (secuencia_indices_optima, distancia_minima_m, tiempo_ms).
     """
     t_inicio = time.perf_counter()
-    n = len(coordenadas)
+    validar_distancias(matriz_distancias)
+    n = len(matriz_distancias)
 
-    if n <= 1:
-        return [0], 0.0, 0.0
-
-    # 1. Precomputar matriz de distancias Haversine O(n²)
-    dist: List[List[float]] = [[0.0 for _ in range(n)] for _ in range(n)]
-    for i in range(n):
-        for j in range(n):
-            if i != j:
-                dist[i][j] = distancia_haversine(
-                    coordenadas[i][0], coordenadas[i][1],
-                    coordenadas[j][0], coordenadas[j][1]
-                )
+    if n == 0:
+        return [], 0.0, 0.0
+    if n == 1:
+        return ([0, 0] if retornar_al_inicio else [0]), 0.0, 0.0
 
     # 2. Tabla de memoización: memo[mask][u] = (costo_minimo, mejor_siguiente_nodo)
     # mask va desde 0 hasta (1 << n) - 1
@@ -146,7 +140,7 @@ def held_karp_tsp(
 
     def _resolver_dp(mask: int, u: int) -> Tuple[float, int]:
         if mask == mascara_completa:
-            costo_final = dist[u][0] if retornar_al_inicio else 0.0
+            costo_final = matriz_distancias[u][0] if retornar_al_inicio else 0.0
             return costo_final, -1
 
         if memo[mask][u] is not None:
@@ -160,7 +154,7 @@ def held_karp_tsp(
             if not (mask & (1 << v)):
                 nueva_mascara = mask | (1 << v)
                 costo_sub, _ = _resolver_dp(nueva_mascara, v)
-                costo_total = dist[u][v] + costo_sub
+                costo_total = matriz_distancias[u][v] + costo_sub
 
                 if costo_total < mejor_costo:
                     mejor_costo = costo_total
@@ -171,6 +165,8 @@ def held_karp_tsp(
 
     # Iniciar desde el nodo 0 con máscara que solo contiene al nodo 0: (1 << 0) = 1
     distancia_optima, _ = _resolver_dp(1, 0)
+    if not math.isfinite(distancia_optima):
+        raise ValueError("No existe un recorrido TSP dirigido que visite todos los nodos.")
 
     # 3. Reconstruir la ruta óptima
     ruta_indices = [0]

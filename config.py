@@ -12,6 +12,11 @@ DATA_DIR = BASE_DIR / "data"
 NODOS_FILE = DATA_DIR / "nodos_cusco.json"
 PEDIDOS_FILE = DATA_DIR / "pedidos.json"
 REPARTIDORES_FILE = DATA_DIR / "repartidores.json"
+RED_VIAL_CACHE_FILE = DATA_DIR / "red_vial_cache.json"
+
+# Construcción offline de la red de interés a partir de OSM.
+RESPETAR_SENTIDOS = True
+K_VECINOS = 3
 
 # Configuración del Mapa
 # Centro inicial en la Plaza de Armas de Cusco

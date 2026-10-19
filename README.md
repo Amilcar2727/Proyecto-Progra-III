@@ -8,6 +8,14 @@ Escuela Profesional de Ingeniería Informática y de Sistemas
 
 Aplicación de escritorio en Python con interfaz gráfica Tkinter (`ttk`) y visualización en mapa interactivo con `tkintermapview` (y fallback offline en `Canvas 2D`), orientada a la gestión logística y optimización multiparadigma de rutas de reparto en la ciudad de Cusco.
 
+## Modelo híbrido de rutas
+
+Los nodos del grafo de los algoritmos siguen siendo los 20 lugares de interés. Las 64 conexiones dirigidas del cache actual representan caminos por calles de OpenStreetMap: el peso es la suma de longitudes OSM en metros y cada arco conserva una polilínea con la geometría vial. La red urbana completa se descarga y procesa solo en el constructor offline; la aplicación carga `data/red_vial_cache.json` y no necesita OSMnx, NetworkX ni Internet para calcular rutas.
+
+Dijkstra, implementado a mano, precalcula las distancias mínimas dirigidas entre lugares. Greedy, Held-Karp, D&C, el orden por distancia y Backtracking usan esos pesos. Haversine queda para la asignación de pedidos a un lugar de interés y para comparar línea recta con recorrido por calles. La GUI muestra por arista el factor de desvío `longitud de red / distancia Haversine`.
+
+El cache se descargó el **19 de octubre de 2026** con `network_type="drive"`. Los resultados son un snapshot de OSM y reflejan los nodos ajustados a la intersección más cercana; los cierres de calle bloquean la conexión entre lugares de interés, no un tramo OSM individual. `drive` no modela restricciones peatonales. Atribución: © OpenStreetMap contributors (ODbL).
+
 ---
 
 ## 🚀 Requisitos e Instalación
@@ -30,6 +38,16 @@ Las dependencias permitidas y utilizadas son:
 - `Pillow` (≥ 10.0.0): Manipulación y rasterización de imágenes y tiles.
 - `pytest` (≥ 8.0.0): Suite de pruebas unitarias automatizadas.
 
+Para construir o verificar el cache (solo desarrollo; no es necesario para ejecutar la app):
+
+```bash
+pip install -r requirements-dev.txt
+python tools/construir_red_vial.py
+python tools/verificar_red_vial.py
+```
+
+El constructor requiere conexión con Overpass. Revisa en su salida cualquier snap a más de 60 m y confirma las coordenadas propuestas antes de aceptar el cache.
+
 ---
 
 ## 💻 Ejecución de la Aplicación
@@ -41,7 +59,7 @@ python main.py
 ```
 
 ### Ejecución de Pruebas Unitarias
-Para correr la suite completa de 23 pruebas automatizadas:
+Para correr la suite completa de pruebas automatizadas:
 
 ```bash
 pytest -v
@@ -63,17 +81,20 @@ rutas_cusco/
 ├─ main.py                      # Punto de entrada de la aplicación
 ├─ config.py                    # Constantes de configuración, mapa, colores y umbrales
 ├─ requirements.txt             # Dependencias del proyecto
+├─ requirements-dev.txt         # OSMnx y NetworkX: solo para construir datos offline
 ├─ pytest.ini                   # Configuración para ejecución de pytest
 ├─ conftest.py                  # Resolución de rutas de importación en pruebas
 │
 ├─ data/                        # Conjuntos de datos en formato JSON
-│  ├─ nodos_cusco.json          # 20 nodos de Cusco (coords aprox.) y 28 aristas
+│  ├─ nodos_cusco.json          # Coordenadas originales de los 20 lugares de interés
+│  ├─ red_vial_cache.json       # Pesos dirigidos, snaps, geometrías y metadatos OSM
 │  ├─ pedidos.json              # 30 pedidos de muestra (prioridades, pesos, valores)
 │  └─ repartidores.json         # 3 repartidores con capacidad y vehículos
 │
-├─ core/                        # LÓGICA ALGORÍTMICA MANUAL (Sin librerías externas)
+├─ core/                        # LÓGICA ALGORÍTMICA MANUAL (sin librerías de grafos)
 │  ├─ modelos.py                # Dataclasses: Nodo, Arista, Grafo, Pedido, Repartidor, Ruta
 │  ├─ geo.py                    # Fórmula de Haversine esférica en metros y centroides
+│  ├─ grafo.py                  # Dijkstra, matriz de distancias y geometría de rutas
 │  ├─ estructuras.py            # Merge Sort, Quick Sort, Búsqueda Binaria, Índices O(1)
 │  ├─ greedy.py                 # Vecino Más Cercano (TSP) y Asignación de Emergencia
 │  ├─ divide_venceras.py        # Partición 2D recursiva por mediana + Teorema Maestro
@@ -96,12 +117,17 @@ rutas_cusco/
 │  ├─ benchmark.py              # Suite de medición empírica de tiempos y calidad
 │  └─ resultados_benchmark.json # Datos reales exportados de corridas empíricas
 │
-├─ tests/                       # PRUEBAS AUTOMATIZADAS (23 tests deterministas)
+├─ tools/
+│  ├─ construir_red_vial.py     # Descarga OSM y genera el cache offline (solo desarrollo)
+│  └─ verificar_red_vial.py     # Tabla de desvíos y PNG de polilíneas
+│
+├─ tests/                       # Pruebas unitarias, de Dijkstra y del cache vial
 │  ├─ test_estructuras.py       # Pruebas de MergeSort, QuickSort y búsquedas
 │  ├─ test_greedy.py            # Pruebas de vecino más cercano y despacho
 │  ├─ test_dyv.py               # Pruebas de partición espacial y ensamble
 │  ├─ test_pd.py                # Pruebas de Mochila clásica y Held-Karp
-│  └─ test_backtracking.py      # Pruebas de exploración y podas en diamante
+│  ├─ test_backtracking.py      # Pruebas de exploración y podas en diamante
+│  └─ test_grafo.py             # Dijkstra, conectividad, cierres y geometría vial
 │
 └─ docs/                        # DOCUMENTACIÓN TÉCNICA Y SUSTENTACIÓN
    ├─ informe.md                # Informe técnico formal con rigor matemático y derivaciones
@@ -123,3 +149,7 @@ rutas_cusco/
 | **Prog. Dinámica** | Mochila 0/1 | $O(N \cdot W)$ | $O(N \cdot W)$ | Matriz DP bidimensional y reconstrucción |
 | **Prog. Dinámica** | Held-Karp TSP | $O(n^2 2^n)$ | $O(n 2^n)$ | Bitmask y memoización para $N \le 12$ |
 | **Backtracking** | Rutas con Poda | $O(V!)$ podado | $O(V)$ | Poda Branch & Bound por costo parcial |
+
+## Verificación de rutas por calles
+
+`python tools/verificar_red_vial.py` imprime para cada arco la distancia Haversine, la longitud vial y el factor de desvío, y genera `data/red_vial_verificacion.png`. En el cache actual el desvío medio por arco es **1.646×**; los extremos son **1.014×** (N12→N14) y **5.854×** (N07→N01). Por ejemplo, el camino N09→N12 se representa como N09→N11→N12, no como una recta.

@@ -26,8 +26,8 @@ def grafo_minimo():
     g.agregar_nodo(Nodo("N01", "Nodo 1", -13.510, -71.980, "Norte"))
     g.agregar_nodo(Nodo("N02", "Nodo 2", -13.520, -71.970, "Sur"))
     g.agregar_nodo(Nodo("N03", "Nodo 3", -13.530, -71.950, "Este"))
-    g.agregar_arista("N01", "N02")
-    g.agregar_arista("N02", "N03")
+    g.agregar_arista("N01", "N02", 100.0)
+    g.agregar_arista("N02", "N03", 200.0)
     return g
 
 

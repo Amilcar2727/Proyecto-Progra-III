@@ -85,7 +85,11 @@ class AppRutasCusco(tk.Tk):
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 4))
 
         # 1. Pestaña Red Vial
-        self.tab_mapa = TabMapa(self.notebook, grafo=self.grafo)
+        self.tab_mapa = TabMapa(
+            self.notebook,
+            grafo=self.grafo,
+            al_hacer_clic_mapa=self._al_hacer_clic_mapa,
+        )
         self.notebook.add(self.tab_mapa, text="  🗺️ Red Vial Cusco  ")
 
         # 2. Pestaña Pedidos
@@ -144,3 +148,7 @@ class AppRutasCusco(tk.Tk):
             foreground="#64748b",
         )
         lbl_unsaac.pack(side=tk.RIGHT)
+
+    def _al_hacer_clic_mapa(self, coordenadas):
+        """Abre un alta de pedido precargada con las coordenadas seleccionadas."""
+        self.tab_pedidos.abrir_formulario_alta(coordenadas)

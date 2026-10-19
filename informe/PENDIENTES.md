@@ -43,4 +43,18 @@ tomarse manualmente y añadirse al informe como Anexo D antes de la entrega.
 
 Las capturas de la GUI son el único componente del informe que no puede generarse
 automáticamente, ya que requieren la interacción visual con la aplicación en ejecución.
-El resto del informe (`informe/main.pdf`) está completo y compilado.
+El PDF `informe/main.pdf` existente es anterior a la actualización del modelo híbrido; después de revisar las secciones LaTeX indicadas arriba, se debe volver a compilarlo.
+
+## Actualización pendiente por el modelo híbrido vial
+
+No editar los archivos LaTeX como parte de este cambio. Antes de la próxima compilación del informe, actualizar estas secciones para que describan el cache vial y los resultados actuales:
+
+| Área | Archivo LaTeX a revisar | Cambios requeridos |
+|---|---|---|
+| Datos y delimitación | `contenido/cap_01_introduccion.tex`, `contenido/cap_02_planteamiento_problema.tex` | Sustituir la descripción de distancias en línea recta/grafo simulado por 20 lugares de interés y conexiones dirigidas por calles; indicar el snapshot OSM, el perfil `drive` y la atribución ODbL. |
+| Modelo y metodología | `contenido/cap_04_marco_teorico.tex`, `contenido/cap_06_metodologia.tex` | Describir el enfoque híbrido, generación offline del cache, mayor componente fuertemente conexa, ajuste de coordenadas, Dijkstra manual y matriz asimétrica. Aclarar que Haversine solo se usa para asignación, partición espacial y comparación. |
+| Hipótesis | `contenido/cap_05_hipotesis.tex` | Revisar afirmaciones/umbrales de calidad que se calcularon con distancias Haversine y contrastarlas con los nuevos benchmarks de red vial. |
+| Resultados y discusión | `contenido/cap_07_resultados_discusion.tex`, `contenido/cap_08_conclusiones_recomendaciones.tex` | Regenerar tablas y figuras con `benchmarks/resultados_benchmark.json`; reportar resultados antes/después, factores de desvío, tiempos y limitaciones de snaps/cierres/datos `drive`. |
+| Anexos | `contenido/cap_09_anexos.tex` | Añadir la tabla/figura de verificación vial y capturas actualizadas de la GUI cuando estén disponibles. |
+
+Al revisar el modelo de datos, confirmar especialmente los ocho nodos cuyo ajuste vial supera 60 m. El JSON conserva las coordenadas originales, las coordenadas ajustadas y las propuestas de corrección; no asumir que las propuestas fueron aprobadas como ubicaciones finales.

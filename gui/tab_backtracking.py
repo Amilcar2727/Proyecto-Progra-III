@@ -160,7 +160,7 @@ class TabBacktracking(ttk.Frame):
         # Cargar lista
         self.lista_rutas.delete(0, tk.END)
         for idx, (camino, dist) in enumerate(self.rutas_actuales):
-            etiqueta = f"#{idx + 1} [{dist:,.1f}m] {' -> '.join(camino)}"
+            etiqueta = f"#{idx + 1} [{dist:,.1f}m por calles] {' -> '.join(camino)}"
             if idx == 0:
                 etiqueta = "★ [ÓPTIMA] " + etiqueta
             self.lista_rutas.insert(tk.END, etiqueta)

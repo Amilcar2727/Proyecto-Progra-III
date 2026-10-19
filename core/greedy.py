@@ -9,7 +9,7 @@ Prohibido el uso de librerías externas de optimización.
 
 import time
 from typing import Dict, List, Optional, Set, Tuple
-from core.geo import distancia_haversine
+from core.grafo import obtener_matriz_distancias
 from core.modelos import Grafo, Pedido, Repartidor, Ruta
 
 
@@ -24,7 +24,7 @@ def vecino_mas_cercano(
 
     Paradigma: Greedy (Voraz).
     Idea: En cada paso, desde la posición actual, el repartidor selecciona y visita
-          el pedido pendiente que se encuentre a la menor distancia geográfica (Haversine),
+          el pedido pendiente con menor distancia dirigida de red (matriz de Dijkstra),
           sin reevaluar decisiones pasadas ni considerar el impacto global futuro.
 
     Complejidad Temporal:
@@ -52,37 +52,44 @@ def vecino_mas_cercano(
             tiempo_computo_ms=0.0,
         )
 
-    # Identificar coordenadas de inicio
-    pos_actual_lat = grafo.nodos[nodo_inicio_id].lat
-    pos_actual_lon = grafo.nodos[nodo_inicio_id].lon
+    if nodo_inicio_id not in grafo.nodos:
+        raise ValueError(f"El nodo inicial {nodo_inicio_id!r} no existe.")
+    matriz = obtener_matriz_distancias(grafo)
 
     pendientes = list(pedidos)
     secuencia_nodos = [nodo_inicio_id]
     pedidos_atendidos = []
     distancia_acumulada = 0.0
+    nodo_actual_id = nodo_inicio_id
 
     while pendientes:
         mejor_dist = float("inf")
         mejor_idx = -1
 
         for idx, p in enumerate(pendientes):
-            dist = distancia_haversine(pos_actual_lat, pos_actual_lon, p.lat, p.lon)
+            if p.nodo_id not in grafo.nodos:
+                raise ValueError(f"El nodo del pedido {p.id!r} no existe en el grafo.")
+            dist = matriz[nodo_actual_id][p.nodo_id]
             if dist < mejor_dist:
                 mejor_dist = dist
                 mejor_idx = idx
 
+        if mejor_idx == -1 or mejor_dist == float("inf"):
+            raise ValueError(
+                f"No hay camino dirigido desde {nodo_actual_id} a ningún pedido pendiente."
+            )
         siguiente_pedido = pendientes.pop(mejor_idx)
         distancia_acumulada += mejor_dist
         secuencia_nodos.append(siguiente_pedido.nodo_id)
         pedidos_atendidos.append(siguiente_pedido.id)
-
-        pos_actual_lat = siguiente_pedido.lat
-        pos_actual_lon = siguiente_pedido.lon
+        nodo_actual_id = siguiente_pedido.nodo_id
 
     if retornar_al_inicio and secuencia_nodos:
-        nodo_fin = grafo.nodos[secuencia_nodos[-1]]
-        nodo_ini = grafo.nodos[nodo_inicio_id]
-        dist_retorno = distancia_haversine(nodo_fin.lat, nodo_fin.lon, nodo_ini.lat, nodo_ini.lon)
+        dist_retorno = matriz[nodo_actual_id][nodo_inicio_id]
+        if dist_retorno == float("inf"):
+            raise ValueError(
+                f"No existe camino dirigido de retorno desde {nodo_actual_id} a {nodo_inicio_id}."
+            )
         distancia_acumulada += dist_retorno
         secuencia_nodos.append(nodo_inicio_id)
 
@@ -104,11 +111,11 @@ def asignar_pedido_emergencia(
     grafo: Grafo,
 ) -> Tuple[Optional[Repartidor], float, float]:
     """
-    Asigna un pedido urgente al repartidor disponible más cercano en distancia lineal.
+    Asigna un pedido urgente al repartidor con menor distancia dirigida por calles.
 
     Paradigma: Greedy (Voraz).
-    Idea: Compara la distancia desde la ubicación del pedido urgente hacia la posición
-          actual de cada repartidor y selecciona el mínimo absoluto que tenga capacidad disponible.
+    Idea: Compara la distancia de red desde la posición actual de cada repartidor hasta
+          el nodo del pedido y elige el mínimo entre quienes tienen capacidad disponible.
 
     Complejidad Temporal:
       - O(R) donde R es la cantidad de repartidores. Como R <= 3 en este sistema, es O(1) efectivo.
@@ -124,19 +131,18 @@ def asignar_pedido_emergencia(
 
     mejor_repartidor = None
     menor_distancia = float("inf")
+    matriz = obtener_matriz_distancias(grafo)
 
     for rep in repartidores:
         # Verificar capacidad de carga
         if rep.cap_peso_kg < pedido_urgente.peso_kg or rep.cap_vol_l < pedido_urgente.volumen_l:
             continue
 
-        pos_rep_nodo = grafo.nodos.get(rep.nodo_actual_id or rep.nodo_inicio_id)
-        if not pos_rep_nodo:
+        pos_rep_id = rep.nodo_actual_id or rep.nodo_inicio_id
+        if pos_rep_id not in grafo.nodos or pedido_urgente.nodo_id not in grafo.nodos:
             continue
 
-        dist = distancia_haversine(
-            pedido_urgente.lat, pedido_urgente.lon, pos_rep_nodo.lat, pos_rep_nodo.lon
-        )
+        dist = matriz[pos_rep_id][pedido_urgente.nodo_id]
         if dist < menor_distancia:
             menor_distancia = dist
             mejor_repartidor = rep

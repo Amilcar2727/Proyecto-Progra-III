@@ -45,7 +45,7 @@ class TabGreedy(ttk.Frame):
 
         ttk.Label(
             panel_izq,
-            text="Toma la mejor decisión local inmediata (menor distancia Haversine) en cada paso sin reconsiderar el pasado.",
+            text="Toma la mejor decisión local inmediata por distancia dirigida de red en cada paso, sin reconsiderar el pasado.",
             wraplength=300,
             font=("Segoe UI", 8),
             foreground="#475569",
@@ -124,12 +124,16 @@ class TabGreedy(ttk.Frame):
             n_pedidos = 8
 
         sub_pedidos = self.pedidos[:n_pedidos]
-        ruta = vecino_mas_cercano(
-            nodo_inicio_id=origen_id,
-            pedidos=sub_pedidos,
-            grafo=self.grafo,
-            retornar_al_inicio=self.var_retorno.get(),
-        )
+        try:
+            ruta = vecino_mas_cercano(
+                nodo_inicio_id=origen_id,
+                pedidos=sub_pedidos,
+                grafo=self.grafo,
+                retornar_al_inicio=self.var_retorno.get(),
+            )
+        except ValueError as error:
+            messagebox.showerror("Ruta no disponible", str(error))
+            return
 
         # Dibujar en mapa
         self.componente_mapa.dibujar_grafo()
@@ -145,7 +149,7 @@ class TabGreedy(ttk.Frame):
         self.txt_resultados.insert(tk.END, "=== RESULTADOS GREEDY (TSP) ===\n")
         self.txt_resultados.insert(tk.END, f"Algoritmo: {ruta.algoritmo_utilizado}\n")
         self.txt_resultados.insert(tk.END, f"Complejidad: O(n²) tiempo, O(n) espacio\n")
-        self.txt_resultados.insert(tk.END, f"Distancia total: {ruta.distancia_total_m:,.2f} m\n")
+        self.txt_resultados.insert(tk.END, f"Distancia total por calles: {ruta.distancia_total_m:,.2f} m\n")
         self.txt_resultados.insert(tk.END, f"Tiempo de cómputo: {ruta.tiempo_computo_ms:.3f} ms\n")
         self.txt_resultados.insert(tk.END, f"Paradas: {len(ruta.secuencia_nodos)} nodos\n")
         self.txt_resultados.insert(tk.END, f"Secuencia: {' -> '.join(ruta.secuencia_nodos)}\n")
@@ -170,17 +174,21 @@ class TabGreedy(ttk.Frame):
             self.txt_resultados.insert(tk.END, f"Pedido: {pedido_urgente.id} (Urgente)\n")
             self.txt_resultados.insert(tk.END, f"Repartidor Asignado: {repartidor.nombre}\n")
             self.txt_resultados.insert(tk.END, f"Vehículo: {repartidor.tipo_vehiculo}\n")
-            self.txt_resultados.insert(tk.END, f"Distancia al pedido: {dist:,.2f} m\n")
+            self.txt_resultados.insert(tk.END, f"Distancia por calles: {dist:,.2f} m\n")
             self.txt_resultados.insert(tk.END, f"Tiempo de decisión: {t_ms:.3f} ms\n")
             self.txt_resultados.insert(tk.END, f"Complejidad: O(R) = O(3) -> O(1)\n")
 
             # Resaltar en mapa
             self.componente_mapa.dibujar_grafo()
-            nodo_rep = self.grafo.nodos[repartidor.nodo_actual_id or repartidor.nodo_inicio_id]
-            self.componente_mapa.set_path(
-                [(nodo_rep.lat, nodo_rep.lon), (pedido_urgente.lat, pedido_urgente.lon)],
+            nodo_rep_id = repartidor.nodo_actual_id or repartidor.nodo_inicio_id
+            self.componente_mapa.resaltar_ruta(
+                [nodo_rep_id, pedido_urgente.nodo_id],
                 color="#e11d48",
-                width=4,
+                ancho=4,
+                nombre_ruta="Despacho de emergencia",
             )
         else:
-            self.txt_resultados.insert(tk.END, "No se encontró ningún repartidor con capacidad suficiente.\n")
+            self.txt_resultados.insert(
+                tk.END,
+                "No hay repartidor con capacidad disponible y un camino transitable hasta el pedido.\n",
+            )

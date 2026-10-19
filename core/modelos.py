@@ -4,8 +4,8 @@ Define las dataclasses para Nodos, Aristas, Grafo de Cusco, Pedidos y Repartidor
 """
 
 from dataclasses import dataclass, field
+import math
 from typing import Dict, List, Optional, Tuple
-from core.geo import distancia_haversine
 
 
 @dataclass
@@ -23,10 +23,12 @@ class Nodo:
 
 @dataclass
 class Arista:
-    """Representa un tramo vial entre dos nodos de la red."""
+    """Representa una conexión dirigida por calles entre dos lugares de interés."""
     origen_id: str
     destino_id: str
-    distancia_m: float
+    longitud_m: float
+    geometria: List[Tuple[float, float]] = field(default_factory=list)
+    calles: List[str] = field(default_factory=list)
     activa: bool = True  # True = transitable, False = calle bloqueada por obras/tráfico
 
 
@@ -82,34 +84,53 @@ class Grafo:
 
     def __init__(self):
         self.nodos: Dict[str, Nodo] = {}
-        # adyacencia[u][v] = Arista(u, v, distancia, activa)
+        # adyacencia[u][v] = Arista dirigida con longitud de red y geometría vial
         self.adyacencia: Dict[str, Dict[str, Arista]] = {}
+        self.matriz_distancias: Optional[Dict[str, Dict[str, float]]] = None
+        self.caminos_minimos: Optional[Dict[str, Dict[str, List[str]]]] = None
+
+    def _invalidar_cache_distancias(self) -> None:
+        self.matriz_distancias = None
+        self.caminos_minimos = None
 
     def agregar_nodo(self, nodo: Nodo) -> None:
         """Agrega un nodo al grafo e inicializa su lista de adyacencia."""
         self.nodos[nodo.id] = nodo
         if nodo.id not in self.adyacencia:
             self.adyacencia[nodo.id] = {}
+        self._invalidar_cache_distancias()
 
     def agregar_arista(
-        self, origen_id: str, destino_id: str, bidireccional: bool = True
+        self,
+        origen_id: str,
+        destino_id: str,
+        longitud_m: float,
+        bidireccional: bool = True,
+        geometria: Optional[List[Tuple[float, float]]] = None,
+        calles: Optional[List[str]] = None,
     ) -> None:
         """
-        Agrega una arista entre dos nodos calculando su peso mediante Haversine.
+        Agrega una conexión con longitud y geometría suministradas por la red vial.
         """
         if origen_id not in self.nodos or destino_id not in self.nodos:
             raise ValueError(f"Nodos {origen_id} o {destino_id} no existen en el grafo.")
-
-        nodo_u = self.nodos[origen_id]
-        nodo_v = self.nodos[destino_id]
-        distancia = distancia_haversine(nodo_u.lat, nodo_u.lon, nodo_v.lat, nodo_v.lon)
-
-        arista_uv = Arista(origen_id, destino_id, distancia, activa=True)
+        if not math.isfinite(longitud_m) or longitud_m < 0:
+            raise ValueError("La longitud de una arista debe ser finita y no negativa.")
+        puntos = list(geometria or [])
+        nombres = list(calles or [])
+        arista_uv = Arista(origen_id, destino_id, float(longitud_m), puntos, nombres)
         self.adyacencia[origen_id][destino_id] = arista_uv
 
         if bidireccional:
-            arista_vu = Arista(destino_id, origen_id, distancia, activa=True)
+            arista_vu = Arista(
+                destino_id,
+                origen_id,
+                float(longitud_m),
+                list(reversed(puntos)),
+                nombres.copy(),
+            )
             self.adyacencia[destino_id][origen_id] = arista_vu
+        self._invalidar_cache_distancias()
 
     def obtener_vecinos_activos(self, nodo_id: str) -> List[Tuple[str, float]]:
         """
@@ -121,13 +142,13 @@ class Grafo:
         vecinos = []
         for destino_id, arista in self.adyacencia[nodo_id].items():
             if arista.activa:
-                vecinos.append((destino_id, arista.distancia_m))
+                vecinos.append((destino_id, arista.longitud_m))
         return vecinos
 
     def cambiar_estado_calle(
         self, u: str, v: str, activa: bool, bidireccional: bool = True
     ) -> bool:
-        """Permite bloquear o reabrir una calle."""
+        """Cierra/reabre la conexión en ambos sentidos cuando existe su arco inverso."""
         modificado = False
         if u in self.adyacencia and v in self.adyacencia[u]:
             self.adyacencia[u][v].activa = activa
@@ -135,6 +156,8 @@ class Grafo:
         if bidireccional and v in self.adyacencia and u in self.adyacencia[v]:
             self.adyacencia[v][u].activa = activa
             modificado = True
+        if modificado:
+            self._invalidar_cache_distancias()
         return modificado
 
     def esta_bloqueada(self, u: str, v: str) -> bool:
@@ -144,13 +167,9 @@ class Grafo:
         return False
 
     def todas_las_aristas(self) -> List[Arista]:
-        """Retorna lista única de aristas (evitando duplicar bidireccionales)."""
-        aristas = []
-        vistos = set()
-        for u in self.adyacencia:
-            for v, arista in self.adyacencia[u].items():
-                par = tuple(sorted([u, v]))
-                if par not in vistos:
-                    vistos.add(par)
-                    aristas.append(arista)
-        return aristas
+        """Retorna todos los arcos dirigidos, incluidos los sentidos inversos."""
+        return [
+            arista
+            for vecinos in self.adyacencia.values()
+            for arista in vecinos.values()
+        ]

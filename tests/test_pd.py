@@ -42,32 +42,33 @@ def test_mochila_capacidad_cero_o_vacio():
 
 
 def test_held_karp_tsp_triangulo_retorno():
-    # Coordenadas en Cusco formando un triángulo
-    coords = [
-        (-13.5167, -71.9788),  # Plaza de Armas
-        (-13.5152, -71.9750),  # San Blas
-        (-13.5204, -71.9753),  # Coricancha
+    # Matriz asimétrica dirigida; el óptimo es 0 -> 2 -> 1 -> 0: 20 m.
+    distancias = [
+        [0.0, 10.0, 15.0],
+        [2.0, 0.0, 9.0],
+        [6.0, 3.0, 0.0],
     ]
 
-    ruta_idx, dist, tiempo_ms = held_karp_tsp(coords, retornar_al_inicio=True)
+    ruta_idx, dist, tiempo_ms = held_karp_tsp(distancias, retornar_al_inicio=True)
 
     # Debe visitar los 3 puntos y retornar al primero
     assert len(ruta_idx) == 4
     assert ruta_idx[0] == 0
     assert ruta_idx[-1] == 0
-    assert set(ruta_idx[:3]) == {0, 1, 2}
-    assert dist > 0.0
+    assert ruta_idx == [0, 2, 1, 0]
+    assert dist == 20.0
     assert tiempo_ms >= 0.0
 
 
 def test_held_karp_tsp_4_puntos():
-    coords = [
-        (-13.5167, -71.9788),
-        (-13.5152, -71.9750),
-        (-13.5204, -71.9753),
-        (-13.5248, -71.9685),
+    distancias = [
+        [0, 4, 8, 7],
+        [3, 0, 2, 6],
+        [5, 3, 0, 1],
+        [2, 7, 4, 0],
     ]
-    ruta_idx, dist, _ = held_karp_tsp(coords, retornar_al_inicio=True)
+    ruta_idx, dist, _ = held_karp_tsp(distancias, retornar_al_inicio=True)
     assert len(ruta_idx) == 5
     assert ruta_idx[0] == 0 and ruta_idx[-1] == 0
     assert set(ruta_idx[:4]) == {0, 1, 2, 3}
+    assert dist == sum(distancias[u][v] for u, v in zip(ruta_idx, ruta_idx[1:]))

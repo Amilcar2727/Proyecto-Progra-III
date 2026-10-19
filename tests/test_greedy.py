@@ -11,12 +11,12 @@ from core.greedy import vecino_mas_cercano, asignar_pedido_emergencia
 @pytest.fixture
 def grafo_simple():
     g = Grafo()
-    # Tres nodos alineados: N01 en (0, 0), N02 en (0, 0.01), N03 en (0, 0.02)
+    # Las longitudes de red, no la posición geográfica, determinan la ruta.
     g.agregar_nodo(Nodo("N01", "Origen", -13.5160, -71.9780, "Centro"))
     g.agregar_nodo(Nodo("N02", "Punto Medio", -13.5180, -71.9780, "Centro"))
     g.agregar_nodo(Nodo("N03", "Punto Lejano", -13.5220, -71.9780, "Centro"))
-    g.agregar_arista("N01", "N02")
-    g.agregar_arista("N02", "N03")
+    g.agregar_arista("N01", "N02", 100.0)
+    g.agregar_arista("N02", "N03", 200.0)
     return g
 
 
@@ -30,7 +30,7 @@ def test_vecino_cercano_orden_esperado(grafo_simple):
     # Desde N01, N02 está más cerca que N03, por lo que el orden debe ser N01 -> N02 -> N03
     assert ruta.secuencia_nodos == ["N01", "N02", "N03"]
     assert ruta.pedidos_cubiertos == ["P2", "P3"]
-    assert ruta.distancia_total_m > 0.0
+    assert ruta.distancia_total_m == 300.0
 
 
 def test_vecino_cercano_con_retorno(grafo_simple):
@@ -39,6 +39,26 @@ def test_vecino_cercano_con_retorno(grafo_simple):
     ]
     ruta = vecino_mas_cercano("N01", pedidos, grafo_simple, retornar_al_inicio=True)
     assert ruta.secuencia_nodos == ["N01", "N02", "N01"]
+    assert ruta.distancia_total_m == 200.0
+
+
+def test_vecino_cercano_respeta_distancias_asimetricas():
+    grafo = Grafo()
+    for nodo_id in ("A", "B", "C"):
+        grafo.agregar_nodo(Nodo(nodo_id, nodo_id, 0.0, 0.0, "test"))
+    grafo.agregar_arista("A", "B", 50.0, bidireccional=False)
+    grafo.agregar_arista("A", "C", 10.0, bidireccional=False)
+    grafo.agregar_arista("C", "B", 5.0, bidireccional=False)
+    grafo.agregar_arista("B", "C", 100.0, bidireccional=False)
+    pedidos = [
+        Pedido("PB", "B", "B", 0, 0, "test", 2, 1.0, 1.0, 10.0),
+        Pedido("PC", "C", "C", 0, 0, "test", 2, 1.0, 1.0, 10.0),
+    ]
+
+    ruta = vecino_mas_cercano("A", pedidos, grafo)
+
+    assert ruta.secuencia_nodos == ["A", "C", "B"]
+    assert ruta.distancia_total_m == 15.0
 
 
 def test_asignacion_emergencia_mas_cercano(grafo_simple):

@@ -5,8 +5,9 @@ Permite inspeccionar el grafo, bloquear/reabrir calles interactivamente y conmut
 
 import tkinter as tk
 from tkinter import ttk, messagebox
-from typing import Optional
+from typing import Callable, Optional, Tuple
 import config
+from core.geo import distancia_haversine
 from core.modelos import Grafo
 from gui.componente_mapa import ComponenteMapa
 
@@ -14,9 +15,19 @@ from gui.componente_mapa import ComponenteMapa
 class TabMapa(ttk.Frame):
     """Pestaña para visualizar la red vial de Cusco y controlar el estado de las vías."""
 
-    def __init__(self, master, grafo: Grafo, *args, **kwargs):
+    def __init__(
+        self,
+        master,
+        grafo: Grafo,
+        al_hacer_clic_mapa: Optional[
+            Callable[[Tuple[float, float]], None]
+        ] = None,
+        *args,
+        **kwargs,
+    ):
         super().__init__(master, *args, **kwargs)
         self.grafo = grafo
+        self.al_hacer_clic_mapa = al_hacer_clic_mapa
 
         self._crear_interfaz()
         self.actualizar_estadisticas()
@@ -35,7 +46,7 @@ class TabMapa(ttk.Frame):
 
         ttk.Label(
             panel_izq,
-            text="Grafo conexo de 20 puntos de referencia. Haz clic sobre una calle o usa el panel inferior para bloquearla/abrirla.",
+            text="Grafo disperso de lugares de interés. Haz clic en una conexión para cerrarla en ambos sentidos; haz clic en el mapa para crear un pedido.",
             wraplength=290,
             font=("Segoe UI", 9),
         ).pack(anchor="w", pady=(0, 10))
@@ -118,16 +129,60 @@ class TabMapa(ttk.Frame):
             wraplength=270,
         ).pack(anchor="w", pady=(4, 0))
 
+        frame_desvio = ttk.LabelFrame(
+            panel_izq, text="Distancia en línea recta vs por calles", padding=5
+        )
+        frame_desvio.pack(fill=tk.BOTH, expand=True, pady=6)
+        columnas = ("arista", "recta", "calles", "factor")
+        self.tabla_desvio = ttk.Treeview(
+            frame_desvio, columns=columnas, show="headings", height=6
+        )
+        self.tabla_desvio.heading("arista", text="A -> B")
+        self.tabla_desvio.heading("recta", text="Recta m")
+        self.tabla_desvio.heading("calles", text="Calles m")
+        self.tabla_desvio.heading("factor", text="Factor")
+        self.tabla_desvio.column("arista", width=66, anchor="center")
+        self.tabla_desvio.column("recta", width=64, anchor="e")
+        self.tabla_desvio.column("calles", width=64, anchor="e")
+        self.tabla_desvio.column("factor", width=52, anchor="e")
+        scroll_desvio = ttk.Scrollbar(
+            frame_desvio, orient=tk.VERTICAL, command=self.tabla_desvio.yview
+        )
+        self.tabla_desvio.configure(yscrollcommand=scroll_desvio.set)
+        self.tabla_desvio.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scroll_desvio.pack(side=tk.RIGHT, fill=tk.Y)
+
         # Panel derecho: Mapa interactivo
         self.componente_mapa = ComponenteMapa(
             self,
             grafo=self.grafo,
             al_hacer_clic_arista=self._al_hacer_clic_calle,
+            al_hacer_clic_mapa=self.al_hacer_clic_mapa,
         )
         self.componente_mapa.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
         # Dibujar el grafo inicial
         self.componente_mapa.dibujar_grafo()
+        self._cargar_tabla_desvio()
+
+    def _cargar_tabla_desvio(self):
+        for arista in self.grafo.todas_las_aristas():
+            origen = self.grafo.nodos[arista.origen_id]
+            destino = self.grafo.nodos[arista.destino_id]
+            recta = distancia_haversine(
+                origen.lat, origen.lon, destino.lat, destino.lon
+            )
+            factor = arista.longitud_m / recta if recta else float("inf")
+            self.tabla_desvio.insert(
+                "",
+                tk.END,
+                values=(
+                    f"{arista.origen_id}->{arista.destino_id}",
+                    f"{recta:.0f}",
+                    f"{arista.longitud_m:.0f}",
+                    f"{factor:.2f}",
+                ),
+            )
 
     def _al_hacer_clic_calle(self, u_id: str, v_id: str):
         """Callback al hacer clic sobre una arista en el mapa."""
@@ -186,5 +241,5 @@ class TabMapa(ttk.Frame):
         activas = len(aristas) - bloqueadas
 
         self.lbl_nodos.config(text=f"Nodos registrados: {n_nodos}")
-        self.lbl_aristas.config(text=f"Calles transitables: {activas}")
-        self.lbl_bloqueadas.config(text=f"Calles bloqueadas: {bloqueadas}")
+        self.lbl_aristas.config(text=f"Arcos dirigidos transitables: {activas}")
+        self.lbl_bloqueadas.config(text=f"Arcos dirigidos cerrados: {bloqueadas}")

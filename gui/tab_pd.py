@@ -13,6 +13,7 @@ import config
 from core.modelos import Grafo, Pedido
 from core.prog_dinamica import resolver_mochila_01, held_karp_tsp
 from core.greedy import vecino_mas_cercano
+from core.grafo import matriz_para_nodos
 from gui.componente_mapa import ComponenteMapa
 
 
@@ -227,23 +228,26 @@ class TabPD(ttk.Frame):
         hilo.start()
 
     def _hilo_held_karp(self, n: int):
-        sub_pedidos = self.pedidos[:n]
-        coords = [(p.lat, p.lon) for p in sub_pedidos]
+        try:
+            sub_pedidos = self.pedidos[:n]
+            matriz = matriz_para_nodos(self.grafo, [p.nodo_id for p in sub_pedidos])
 
-        # 1. Ejecutar Held-Karp
-        idx_hk, dist_hk, t_hk = held_karp_tsp(coords, retornar_al_inicio=True)
+            # 1. Ejecutar Held-Karp
+            idx_hk, dist_hk, t_hk = held_karp_tsp(matriz, retornar_al_inicio=True)
 
-        # 2. Ejecutar Greedy en los mismos puntos
-        # Usamos el nodo del primer pedido como punto de partida
-        origen_id = sub_pedidos[0].nodo_id
-        ruta_greedy = vecino_mas_cercano(
-            nodo_inicio_id=origen_id,
-            pedidos=sub_pedidos[1:],
-            grafo=self.grafo,
-            retornar_al_inicio=True,
-        )
+            # 2. Ejecutar Greedy en los mismos puntos
+            origen_id = sub_pedidos[0].nodo_id
+            ruta_greedy = vecino_mas_cercano(
+                nodo_inicio_id=origen_id,
+                pedidos=sub_pedidos[1:],
+                grafo=self.grafo,
+                retornar_al_inicio=True,
+            )
 
-        secuencia_nodos_hk = [sub_pedidos[i].nodo_id for i in idx_hk]
+            secuencia_nodos_hk = [sub_pedidos[i].nodo_id for i in idx_hk]
+        except (IndexError, KeyError, ValueError) as error:
+            self.after(0, self._finalizar_held_karp_error, str(error))
+            return
 
         # Actualizar GUI en el hilo principal
         self.after(
@@ -255,6 +259,12 @@ class TabPD(ttk.Frame):
             t_hk,
             ruta_greedy,
         )
+
+    def _finalizar_held_karp_error(self, mensaje: str):
+        self.progreso_hk.stop()
+        self.btn_ejecutar_hk.config(state="normal")
+        self.txt_res_hk.delete("1.0", tk.END)
+        messagebox.showerror("Recorrido no disponible", mensaje)
 
     def _finalizar_held_karp(
         self,
@@ -293,12 +303,12 @@ class TabPD(ttk.Frame):
         self.txt_res_hk.insert(tk.END, "=== COMPARATIVA TSP: HELD-KARP vs GREEDY ===\n\n")
         self.txt_res_hk.insert(tk.END, f"Puntos evaluados: N = {n}\n\n")
         self.txt_res_hk.insert(tk.END, "--- 1. Held-Karp (Óptimo Global) ---\n")
-        self.txt_res_hk.insert(tk.END, f"• Distancia: {dist_hk:,.2f} m\n")
+        self.txt_res_hk.insert(tk.END, f"• Distancia por calles: {dist_hk:,.2f} m\n")
         self.txt_res_hk.insert(tk.END, f"• Tiempo de cómputo: {t_hk:.3f} ms\n")
         self.txt_res_hk.insert(tk.END, f"• Complejidad: O(n² 2ⁿ)\n\n")
 
         self.txt_res_hk.insert(tk.END, "--- 2. Greedy (Heurística Voraz) ---\n")
-        self.txt_res_hk.insert(tk.END, f"• Distancia: {ruta_greedy.distancia_total_m:,.2f} m\n")
+        self.txt_res_hk.insert(tk.END, f"• Distancia por calles: {ruta_greedy.distancia_total_m:,.2f} m\n")
         self.txt_res_hk.insert(tk.END, f"• Tiempo de cómputo: {ruta_greedy.tiempo_computo_ms:.3f} ms\n")
         self.txt_res_hk.insert(tk.END, f"• Complejidad: O(n²)\n\n")
 

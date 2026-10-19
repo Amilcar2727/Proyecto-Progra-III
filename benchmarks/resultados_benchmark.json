@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-18 13:15:56",
+  "timestamp": "2026-10-19 10:27:21",
   "ordenacion": {
     "n": [
       10,
@@ -7,14 +7,14 @@
       30
     ],
     "merge_sort_ms": [
-      0.0163,
-      0.0306,
-      0.0514
+      0.0169,
+      0.037,
+      0.0605
     ],
     "quick_sort_ms": [
-      0.0158,
-      0.029,
-      0.0431
+      0.0195,
+      0.0352,
+      0.0514
     ]
   },
   "tsp_comparativa": {
@@ -26,46 +26,46 @@
       12
     ],
     "tiempo_greedy_ms": [
-      0.037,
-      0.035,
-      0.069,
-      0.115,
-      0.304
+      0.012,
+      0.01,
+      0.012,
+      0.022,
+      0.032
     ],
     "tiempo_held_karp_ms": [
-      0.282,
-      0.272,
-      1.392,
-      5.845,
-      42.204
+      0.059,
+      0.06,
+      0.865,
+      6.631,
+      35.584
     ],
     "distancia_greedy_m": [
-      905.72,
-      2200.13,
-      4591.81,
-      5644.48,
-      7388.39
+      1866.35,
+      3685.04,
+      9474.5,
+      10656.39,
+      13651.62
     ],
     "distancia_held_karp_m": [
-      905.72,
-      2181.22,
-      4089.09,
-      5026.46,
-      6435.45
+      1866.35,
+      3685.04,
+      7608.16,
+      8790.04,
+      11785.27
     ],
     "gap_porcentaje": [
       0.0,
-      0.87,
-      12.29,
-      12.3,
-      14.81
+      0.0,
+      24.53,
+      21.23,
+      15.84
     ],
     "speedup_greedy": [
-      7.6,
-      7.8,
-      20.2,
-      50.8,
-      138.8
+      4.9,
+      6.0,
+      72.1,
+      301.4,
+      1112.0
     ]
   },
   "backtracking": {
@@ -73,42 +73,42 @@
       {
         "par": "N01 -> N04",
         "descripcion": "Plaza de Armas -> San Pedro (Cercano)",
-        "rutas_encontradas": 4,
-        "ramas_podadas": 24,
-        "estados_visitados": 64,
-        "distancia_optima_m": 590.2,
+        "rutas_encontradas": 1,
+        "ramas_podadas": 1,
+        "estados_visitados": 448,
+        "distancia_optima_m": 790.8,
         "nodos_camino": 2,
-        "tiempo_ms": 0.167
+        "tiempo_ms": 0.516
       },
       {
         "par": "N02 -> N11",
         "descripcion": "San Blas -> Wanchaq (Medio)",
-        "rutas_encontradas": 3,
-        "ramas_podadas": 16,
-        "estados_visitados": 39,
-        "distancia_optima_m": 1653.35,
-        "nodos_camino": 5,
-        "tiempo_ms": 0.058
+        "rutas_encontradas": 1,
+        "ramas_podadas": 10,
+        "estados_visitados": 20,
+        "distancia_optima_m": 1778.62,
+        "nodos_camino": 4,
+        "tiempo_ms": 0.019
       },
       {
         "par": "N01 -> N15",
         "descripcion": "Plaza de Armas -> UNSAAC (Largo)",
-        "rutas_encontradas": 4,
-        "ramas_podadas": 39,
-        "estados_visitados": 120,
-        "distancia_optima_m": 3449.22,
+        "rutas_encontradas": 2,
+        "ramas_podadas": 40,
+        "estados_visitados": 142,
+        "distancia_optima_m": 4524.34,
         "nodos_camino": 7,
-        "tiempo_ms": 0.178
+        "tiempo_ms": 0.12
       },
       {
         "par": "N05 -> N19",
         "descripcion": "Santiago -> San Sebastián (Extremo)",
-        "rutas_encontradas": 9,
-        "ramas_podadas": 286,
-        "estados_visitados": 947,
-        "distancia_optima_m": 6778.84,
-        "nodos_camino": 9,
-        "tiempo_ms": 1.073
+        "rutas_encontradas": 7,
+        "ramas_podadas": 269,
+        "estados_visitados": 955,
+        "distancia_optima_m": 9034.33,
+        "nodos_camino": 10,
+        "tiempo_ms": 0.885
       }
     ]
   }

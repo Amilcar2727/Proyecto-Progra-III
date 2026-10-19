@@ -9,10 +9,11 @@ Prohibido el uso de librerías externas de partición o k-d trees precompilados.
 import time
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
-from core.geo import distancia_haversine, centroide
+from core.geo import centroide
 from core.modelos import Grafo, Pedido, Ruta
 from core.estructuras import quick_sort
 from core.greedy import vecino_mas_cercano
+from core.grafo import obtener_matriz_distancias
 
 
 @dataclass
@@ -92,7 +93,7 @@ def resolver_rutas_dyv(
     Aplica Divide y Vencerás completo:
     1. Segmenta la ciudad en zonas con <= K pedidos.
     2. Resuelve cada zona localmente (mediante Greedy sobre el clúster).
-    3. Conecta las zonas ordenando los clústeres por proximidad de centroides.
+    3. Elige la siguiente zona según el primer tramo de menor distancia por calles.
 
     Complejidad Temporal Total:
       - Partición: O(n log n)
@@ -112,39 +113,42 @@ def resolver_rutas_dyv(
         zona = ZonaReparto(id_zona=idx + 1, pedidos=grupo, centroide=c)
         zonas.append(zona)
 
-    # Ordenar las zonas por distancia de su centroide al punto de partida o nodo actual
-    nodo_actual_lat = grafo.nodos[nodo_inicio_id].lat
-    nodo_actual_lon = grafo.nodos[nodo_inicio_id].lon
-
     zonas_pendientes = list(zonas)
     zonas_ordenadas: List[ZonaReparto] = []
-
-    pos_c_lat = nodo_actual_lat
-    pos_c_lon = nodo_actual_lon
+    nodo_cursor = nodo_inicio_id
+    matriz = obtener_matriz_distancias(grafo)
 
     while zonas_pendientes:
         mejor_dist = float("inf")
         mejor_idx = -1
+        mejor_ruta = None
         for idx, z in enumerate(zonas_pendientes):
-            d = distancia_haversine(pos_c_lat, pos_c_lon, z.centroide[0], z.centroide[1])
+            ruta_zona = vecino_mas_cercano(
+                nodo_cursor, z.pedidos, grafo, retornar_al_inicio=False
+            )
+            primer_destino = ruta_zona.secuencia_nodos[1]
+            d = matriz[nodo_cursor][primer_destino]
             if d < mejor_dist:
                 mejor_dist = d
                 mejor_idx = idx
+                mejor_ruta = ruta_zona
 
+        if mejor_idx < 0 or mejor_ruta is None:
+            raise ValueError(f"No se pudo seleccionar una zona alcanzable desde {nodo_cursor}.")
         siguiente_zona = zonas_pendientes.pop(mejor_idx)
+        siguiente_zona.ruta_local = mejor_ruta
         zonas_ordenadas.append(siguiente_zona)
-        pos_c_lat = siguiente_zona.centroide[0]
-        pos_c_lon = siguiente_zona.centroide[1]
+        nodo_cursor = mejor_ruta.secuencia_nodos[-1]
 
-    # Resolver sub-ruta dentro de cada zona y concatenar
+    # Concatenar sub-rutas calculadas con distancias dirigidas por calles.
     secuencia_global = [nodo_inicio_id]
     pedidos_global = []
     distancia_total = 0.0
-    nodo_cursor = nodo_inicio_id
 
     for zona in zonas_ordenadas:
-        sub_ruta = vecino_mas_cercano(nodo_cursor, zona.pedidos, grafo, retornar_al_inicio=False)
-        zona.ruta_local = sub_ruta
+        sub_ruta = zona.ruta_local
+        if sub_ruta is None:
+            raise RuntimeError(f"La zona {zona.id_zona} no tiene una ruta local calculada.")
 
         # Concatenar secuencia (omitiendo duplicar el nodo de enganche si ya está)
         for nid in sub_ruta.secuencia_nodos:
@@ -153,9 +157,6 @@ def resolver_rutas_dyv(
 
         pedidos_global.extend(sub_ruta.pedidos_cubiertos)
         distancia_total += sub_ruta.distancia_total_m
-
-        if sub_ruta.secuencia_nodos:
-            nodo_cursor = sub_ruta.secuencia_nodos[-1]
 
     t_fin = time.perf_counter()
     tiempo_ms = (t_fin - t_inicio) * 1000.0

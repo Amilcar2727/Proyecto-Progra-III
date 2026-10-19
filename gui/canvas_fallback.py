@@ -143,10 +143,7 @@ class CanvasFallback(tk.Canvas):
         lat, lon = self.pixel_a_geo(event.x, event.y)
         # Notificar a los listeners del mapa
         for cb in self.callbacks_click:
-            try:
-                cb((lat, lon))
-            except Exception:
-                pass
+            cb((lat, lon))
 
     def redibujar(self):
         """Limpia el canvas y vuelve a trazar caminos y marcadores con las dimensiones actuales."""

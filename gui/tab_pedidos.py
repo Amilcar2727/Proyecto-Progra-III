@@ -7,7 +7,7 @@ Permite dar de alta nuevos pedidos mediante formulario.
 
 import tkinter as tk
 from tkinter import ttk, messagebox
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 from core.modelos import Grafo, Pedido
 from core.estructuras import (
     merge_sort,
@@ -16,8 +16,8 @@ from core.estructuras import (
     construir_indice_id,
     construir_indice_invertido_sector,
 )
-from core.geo import distancia_haversine
-from config import MAPA_CENTRO_LAT, MAPA_CENTRO_LON
+from core.geo import nodo_mas_cercano_haversine
+from core.grafo import obtener_matriz_distancias
 
 
 class TabPedidos(ttk.Frame):
@@ -53,7 +53,7 @@ class TabPedidos(ttk.Frame):
         btn_nuevo = ttk.Button(
             panel_top,
             text="➕ Nuevo Pedido",
-            command=self._abrir_formulario_alta,
+            command=self.abrir_formulario_alta,
         )
         btn_nuevo.pack(side=tk.RIGHT, padx=5)
 
@@ -135,7 +135,7 @@ class TabPedidos(ttk.Frame):
         self.tabla.heading("peso", text="Peso (kg)")
         self.tabla.heading("volumen", text="Vol. (L)")
         self.tabla.heading("valor", text="Valor (S/.)")
-        self.tabla.heading("dist_centro", text="Dist. Plaza (m)")
+        self.tabla.heading("dist_centro", text="Dist. Plaza por calles (m)")
 
         self.tabla.column("id", width=85, anchor="center")
         self.tabla.column("cliente", width=200)
@@ -157,8 +157,9 @@ class TabPedidos(ttk.Frame):
             self.tabla.delete(item)
 
         prioridades_texto = {1: "1 - Urgente", 2: "2 - Media", 3: "3 - Baja"}
+        matriz = obtener_matriz_distancias(self.grafo)
         for p in lista_pedidos:
-            d_centro = distancia_haversine(p.lat, p.lon, MAPA_CENTRO_LAT, MAPA_CENTRO_LON)
+            d_centro = matriz["N01"][p.nodo_id]
             self.tabla.insert(
                 "",
                 tk.END,
@@ -171,7 +172,7 @@ class TabPedidos(ttk.Frame):
                     f"{p.peso_kg:.1f}",
                     f"{p.volumen_l:.1f}",
                     f"S/. {p.valor_soles:.2f}",
-                    f"{d_centro:.1f}",
+                    f"{d_centro:,.1f}" if d_centro != float("inf") else "Inalcanzable",
                 ),
             )
         self.lbl_total.config(text=f"Mostrando: {len(lista_pedidos)} pedidos")
@@ -191,7 +192,8 @@ class TabPedidos(ttk.Frame):
             key_func = lambda p: p.peso_kg
             reverse = False
         else:  # Distancia al Centro
-            key_func = lambda p: distancia_haversine(p.lat, p.lon, MAPA_CENTRO_LAT, MAPA_CENTRO_LON)
+            matriz = obtener_matriz_distancias(self.grafo)
+            key_func = lambda p: matriz["N01"][p.nodo_id]
             reverse = False
 
         if "Merge Sort" in algo_seleccionado:
@@ -257,11 +259,13 @@ class TabPedidos(ttk.Frame):
         self.pedidos_actuales = list(self.pedidos)
         self.refrescar_tabla(self.pedidos_actuales)
 
-    def _abrir_formulario_alta(self):
+    def abrir_formulario_alta(
+        self, coordenadas: Optional[Tuple[float, float]] = None
+    ):
         """Ventana modal para registrar un nuevo pedido."""
         ventana = tk.Toplevel(self)
         ventana.title("Registrar Nuevo Pedido")
-        ventana.geometry("400x480")
+        ventana.geometry("400x520")
         ventana.transient(self)
         ventana.grab_set()
 
@@ -279,12 +283,23 @@ class TabPedidos(ttk.Frame):
         entry_cliente.insert(0, "Cliente Ejemplo")
         entry_cliente.pack(fill=tk.X, pady=2)
 
-        ttk.Label(frame, text="Nodo de Referencia en Cusco:").pack(anchor="w", pady=(8, 0))
-        nodos_vals = [f"{n.id}: {n.nombre}" for n in self.grafo.nodos.values()]
-        combo_nodo = ttk.Combobox(frame, values=nodos_vals, state="readonly")
-        if nodos_vals:
-            combo_nodo.current(0)
-        combo_nodo.pack(fill=tk.X, pady=2)
+        latitud_inicial, longitud_inicial = coordenadas or (-13.5167, -71.9788)
+        ttk.Label(frame, text="Latitud del pedido:").pack(anchor="w", pady=(8, 0))
+        entry_lat = ttk.Entry(frame, width=18)
+        entry_lat.insert(0, str(latitud_inicial))
+        entry_lat.pack(anchor="w", pady=2)
+
+        ttk.Label(frame, text="Longitud del pedido:").pack(anchor="w", pady=(6, 0))
+        entry_lon = ttk.Entry(frame, width=18)
+        entry_lon.insert(0, str(longitud_inicial))
+        entry_lon.pack(anchor="w", pady=2)
+        lbl_asignacion = ttk.Label(
+            frame,
+            text="El nodo de interés más cercano se asignará al guardar.",
+            wraplength=360,
+            foreground="#475569",
+        )
+        lbl_asignacion.pack(anchor="w", pady=(2, 0))
 
         ttk.Label(frame, text="Prioridad (1: Urgente, 2: Media, 3: Baja):").pack(anchor="w", pady=(8, 0))
         spin_prio = ttk.Spinbox(frame, from_=1, to=3, width=5)
@@ -316,19 +331,26 @@ class TabPedidos(ttk.Frame):
                 peso = float(entry_peso.get())
                 vol = float(entry_vol.get())
                 val = float(entry_valor.get())
+                lat = float(entry_lat.get())
+                lon = float(entry_lon.get())
             except ValueError:
                 messagebox.showerror("Error", "Valores numéricos inválidos.")
                 return
+            if not -90 <= lat <= 90 or not -180 <= lon <= 180:
+                messagebox.showerror("Error", "Latitud o longitud fuera de rango.")
+                return
 
-            nid = combo_nodo.get().split(":")[0].strip()
+            nid, distancia_asignacion = nodo_mas_cercano_haversine(
+                lat, lon, self.grafo.nodos.values()
+            )
             nodo_obj = self.grafo.nodos[nid]
 
             p = Pedido(
                 id=nuevo_id,
                 cliente=cliente,
                 nodo_id=nid,
-                lat=nodo_obj.lat,
-                lon=nodo_obj.lon,
+                lat=lat,
+                lon=lon,
                 sector=nodo_obj.sector,
                 prioridad=prio,
                 peso_kg=peso,
@@ -338,7 +360,11 @@ class TabPedidos(ttk.Frame):
             self.pedidos.append(p)
             self._actualizar_indices()
             self._restablecer_lista()
-            messagebox.showinfo("Éxito", f"Pedido {nuevo_id} registrado correctamente.")
+            messagebox.showinfo(
+                "Éxito",
+                f"Pedido {nuevo_id} registrado y asignado a {nodo_obj.id}: "
+                f"{nodo_obj.nombre} ({distancia_asignacion:.1f} m en línea recta).",
+            )
             ventana.destroy()
 
         btn_guardar = ttk.Button(frame, text="Guardar Pedido", command=_guardar)

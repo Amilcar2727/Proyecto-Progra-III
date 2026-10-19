@@ -6,18 +6,23 @@ Lee y guarda entidades (Nodos, Aristas, Pedidos, Repartidores) desde y hacia arc
 import json
 from pathlib import Path
 from typing import List, Tuple
-from config import NODOS_FILE, PEDIDOS_FILE, REPARTIDORES_FILE
+from config import PEDIDOS_FILE, RED_VIAL_CACHE_FILE, REPARTIDORES_FILE
 from core.modelos import Grafo, Nodo, Pedido, Repartidor
+from core.grafo import calcular_matriz_distancias
 
 
-def cargar_grafo(ruta_json: Path = NODOS_FILE) -> Grafo:
+def cargar_grafo(ruta_json: Path = RED_VIAL_CACHE_FILE) -> Grafo:
     """
-    Lee el archivo de nodos y aristas de Cusco y construye el objeto Grafo.
-    Calcula distancias geográficas reales mediante Haversine para cada arista.
+    Carga lugares, pesos y polilíneas del cache offline de OSM.
+
+    El cache vial contiene todo lo necesario para construir el grafo en ejecución.
     """
     grafo = Grafo()
     if not ruta_json.exists():
-        raise FileNotFoundError(f"No se encontró el archivo de grafo en: {ruta_json}")
+        raise FileNotFoundError(
+            f"No se encontró el cache vial en: {ruta_json}. "
+            "Genérelo con `python tools/construir_red_vial.py`."
+        )
 
     with open(ruta_json, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -26,15 +31,25 @@ def cargar_grafo(ruta_json: Path = NODOS_FILE) -> Grafo:
         nodo = Nodo(
             id=item["id"],
             nombre=item["nombre"],
-            lat=float(item["lat"]),
-            lon=float(item["lon"]),
-            sector=item["sector"],
+            lat=float(item["lat_ajustado"]),
+            lon=float(item["lon_ajustado"]),
+            sector=item.get("sector", ""),
         )
         grafo.agregar_nodo(nodo)
 
-    for u, v in data.get("aristas", []):
-        grafo.agregar_arista(u, v, bidireccional=True)
+    for item in data.get("aristas", []):
+        grafo.agregar_arista(
+            origen_id=item["origen"],
+            destino_id=item["destino"],
+            longitud_m=float(item["longitud_m"]),
+            bidireccional=False,
+            geometria=[
+                (float(lat), float(lon)) for lat, lon in item["geometria"]
+            ],
+            calles=item.get("calles", []),
+        )
 
+    calcular_matriz_distancias(grafo)
     return grafo
 
 

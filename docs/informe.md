@@ -16,10 +16,20 @@ La optimización de rutas de distribución urbana es un desafío computacional d
 
 El presente proyecto implementa el **"Sistema de Gestión de Rutas Óptimas en Cusco"**, una aplicación de escritorio modular desarrollada en Python 3.13 con interfaz gráfica en Tkinter (`ttk`) y visualización geoespacial con `tkintermapview` (con soporte de conmutación a tiles de OpenStreetMap y Google Maps, además de un mecanismo de fallback autónomo a `Canvas` vectorial 2D para operación fuera de línea).
 
-El núcleo del sistema gestiona una flota de despacho y una cartera de pedidos distribuidos sobre un grafo de **20 nodos representativos de Cusco** (Plaza de Armas, San Blas, Coricancha, Mercado San Pedro, Santiago, Wanchaq, UNSAAC, San Sebastián, etc.) y **28 tramos viales**.
+El núcleo del sistema gestiona una flota de despacho y una cartera de pedidos distribuidos sobre un grafo de **20 nodos representativos de Cusco** (Plaza de Armas, San Blas, Coricancha, Mercado San Pedro, Santiago, Wanchaq, UNSAAC, San Sebastián, etc.) y **64 conexiones dirigidas** en el cache vial actual.
 
 ### Restricción Fundamental de Ingeniería
-Todos los algoritmos centrales fueron implementados **estrictamente a mano**, sin delegar la lógica en bibliotecas de terceros (`networkx`, `itertools`, `scipy.optimize`) ni en métodos internos de ordenación de Python (`sorted()`, `.sort()`), cumpliendo con la exigencia académica de diseño algorítmico puro.
+Los algoritmos centrales fueron implementados **a mano**. En particular, Dijkstra no delega la búsqueda en una biblioteca: `heapq` se usa únicamente como cola de prioridad. NetworkX y OSMnx se reservan para el script de desarrollo que construye el cache; no son dependencias de ejecución y la aplicación no descarga datos.
+
+### 1.1. Modelo híbrido: lugares de interés sobre red vial
+
+Los 20 lugares siguen siendo los vértices usados por Greedy, Held-Karp, D&C y Backtracking. Un arco dirigido entre dos lugares representa el camino más corto encontrado entre sus puntos ajustados sobre la red vial de OpenStreetMap; el peso es la suma de `length` de sus tramos en metros y su geometría es una polilínea que conserva las curvas de las calles. El cache actual tiene 64 arcos, con grado de salida entre 3 y 4; se parte de los tres vecinos más próximos por distancia de red y se añaden únicamente conexiones necesarias para mantener la conectividad fuerte.
+
+El script `tools/construir_red_vial.py` descarga una sola vez la red `drive`, obtiene su mayor componente fuertemente conexa, ajusta los lugares y escribe `data/red_vial_cache.json`. La app carga ese JSON sin OSMnx ni Internet. Dijkstra, implementado manualmente, produce la matriz dirigida de distancias mínimas y reconstruye los caminos entre lugares. Su complejidad es $O((V+E)\log V)$ en tiempo y $O(V)$ en espacio por origen. Cuando `RESPETAR_SENTIDOS = True`, una ruta A→B puede diferir de B→A; si es `False`, el cache se simetriza con la menor longitud entre ambos sentidos.
+
+Haversine **no es un peso de los algoritmos**: se conserva para asignar pedidos por coordenadas al lugar de interés más cercano, para la partición espacial de D&C y como distancia de comparación. Para cada arco se informa el factor de desvío `longitud de red / distancia Haversine`. En el cache actual el promedio es **1.646×**, el mínimo **1.014×** (N12→N14) y el máximo **5.854×** (N07→N01). La conexión N09→N12 no es un arco directo: la ruta por la red de interés actual es N09→N11→N12, de **1,961.56 m**.
+
+**Limitaciones y procedencia:** ocho nodos quedaron a más de 60 m de la calle más cercana y deben revisarse con conocimiento local; sus coordenadas originales se conservaron y el cache documenta la propuesta de ajuste. El cierre interactivo bloquea la conexión entre dos lugares de interés (y su inversa), no un segmento individual de la red OSM. Los datos corresponden al snapshot descargado el 19 de octubre de 2026 y pueden quedar desactualizados. El perfil `drive` modela circulación vehicular y no contempla restricciones peatonales. Atribución de datos: © OpenStreetMap contributors (ODbL).
 
 ---
 
@@ -76,7 +86,7 @@ Todos los algoritmos centrales fueron implementados **estrictamente a mano**, si
 
 #### A. Heurística del Vecino Más Cercano (Nearest Neighbor TSP)
 - **Paradigma:** Greedy (Voraz).
-- **Idea:** Partiendo de la posición inicial del repartidor, selecciona iterativamente el pedido no visitado más próximo calculando la distancia esférica de Haversine. No reconsidera decisiones tomadas.
+- **Idea:** Partiendo de la posición inicial, selecciona iterativamente el pedido pendiente con menor distancia mínima por calles, consultada en la matriz dirigida de Dijkstra. No reconsidera decisiones tomadas.
 - **Pseudocódigo:**
   ```text
   Función VecinoMasCercano(nodo_inicio, pedidos):
@@ -84,7 +94,7 @@ Todos los algoritmos centrales fueron implementados **estrictamente a mano**, si
       pendientes = copia(pedidos)
       pos_actual = nodo_inicio
       mientras pendientes no esté vacío:
-          mejor_p = argmin_{p in pendientes} Haversine(pos_actual, p.coords)
+          mejor_p = argmin_{p in pendientes} Dijkstra(pos_actual, p.nodo_id)
           ruta.agregar(mejor_p.nodo)
           pos_actual = mejor_p.coords
           pendientes.eliminar(mejor_p)
@@ -139,13 +149,14 @@ Todos los algoritmos centrales fueron implementados **estrictamente a mano**, si
   - Costo de transición por estado: iterar sobre los $N$ posibles siguientes nodos $\implies O(N)$.
   - **Tiempo:** $O(N^2 \cdot 2^N)$.
   - **Espacio:** $O(N \cdot 2^N)$ para la tabla de memoización.
-  - **Justificación del límite $N \le 12$:** Para $N=12$, $12^2 \cdot 2^{12} = 144 \times 4096 \approx 5.89 \times 10^5$ operaciones (tiempo real: 31.97 ms). Para $N=16$, superaría $1.6 \times 10^7$ operaciones, congelando interfaces interactivas.
+    - La matriz de costos puede ser asimétrica porque representa calles de sentido único; la recurrencia usa el costo dirigido `dist[u][v]` y no presupone simetría.
+    - **Límite operativo medido:** para $N=12$ el benchmark actual registra 40.428 ms en el hardware de prueba. El costo crece exponencialmente con $N$.
 
 ---
 
 ### 2.5. Paradigma de Backtracking con Poda (Branch and Bound)
 
-- **Idea:** Explora en profundidad (DFS) todos los caminos simples entre un nodo origen y destino en el grafo vial de Cusco.
+- **Idea:** Explora en profundidad (DFS) caminos simples entre un nodo origen y destino en el grafo disperso de lugares de interés; cada conexión activa representa una ruta vial y tiene un sentido.
 - **Condiciones de Poda:**
   1. **Detección de Ciclos:** Mantiene un conjunto `visitados`; ningún nodo se repite en un camino simple.
   2. **Restricción de Calles Bloqueadas:** Si una arista $(u, v)$ tiene `activa == False`, no se transita.
@@ -165,36 +176,48 @@ Los siguientes datos corresponden a ejecuciones directas realizadas sobre el har
 
 | $N$ (Entregas) | Tiempo Greedy (ms) | Tiempo Held-Karp (ms) | Distancia Greedy (m) | Distancia Óptima (m) | Gap de Ineficiencia (%) | Speedup Greedy |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **3** | 0.017 ms | 0.093 ms | 905.72 m | 905.72 m | **0.00 %** | 5.5x |
-| **5** | 0.027 ms | 0.084 ms | 2,200.13 m | 2,181.22 m | **0.87 %** | 3.1x |
-| **8** | 0.057 ms | 1.094 ms | 4,591.81 m | 4,089.09 m | **12.29 %** | 19.2x |
-| **10** | 0.088 ms | 4.740 ms | 5,644.48 m | 5,026.46 m | **12.30 %** | 53.9x |
-| **12** | 0.183 ms | 31.977 ms | 7,388.39 m | 6,435.45 m | **14.81 %** | **174.7x** |
+| **3** | 0.011 ms | 0.061 ms | 1,866.35 m | 1,866.35 m | **0.00 %** | 5.5x |
+| **5** | 0.008 ms | 0.085 ms | 3,685.04 m | 3,685.04 m | **0.00 %** | 10.6x |
+| **8** | 0.030 ms | 1.312 ms | 9,474.50 m | 7,608.16 m | **24.53 %** | 43.7x |
+| **10** | 0.019 ms | 6.484 ms | 10,656.39 m | 8,790.04 m | **21.23 %** | 341.3x |
+| **12** | 0.025 ms | 40.428 ms | 13,651.62 m | 11,785.27 m | **15.84 %** | **1,617.1x** |
 
 **Análisis:**
-- Para instancias pequeñas ($N \le 5$), la heurística voraz se aproxima a menos del 1% del óptimo.
-- A medida que $N$ escala a 12, la miopía del enfoque Greedy acumula un desvío del **14.81%** en distancia (952.94 metros adicionales recorridos por el repartidor).
-- Sin embargo, en tiempo computacional, Greedy es **174 veces más rápido** en $N=12$, evidenciando el compromiso clásico entre calidad de solución y costo computacional.
+- Para $N \le 5$, Greedy coincide con el óptimo en las instancias medidas; esto es un resultado empírico, no una garantía general.
+- En $N=8$, Greedy recorre 1,866.34 m más que Held-Karp (gap **24.53%**). Para $N=12$, la diferencia es 1,866.35 m (**15.84%**).
+- Greedy es **1,617.1 veces más rápido** que Held-Karp en la instancia de 12 destinos, evidenciando el compromiso entre calidad de solución y costo computacional.
 
 ### 3.2. Comparación de Algoritmos de Ordenamiento
 
 | Tamaño $N$ | Merge Sort Promedio (ms) | Quick Sort Promedio (ms) |
 | :---: | :---: | :---: |
-| **10 pedidos** | 0.0159 ms | 0.0139 ms |
-| **20 pedidos** | 0.0301 ms | 0.0618 ms |
-| **30 pedidos** | 0.0865 ms | 0.0516 ms |
+| **10 pedidos** | 0.0195 ms | 0.0173 ms |
+| **20 pedidos** | 0.0354 ms | 0.0320 ms |
+| **30 pedidos** | 0.0555 ms | 0.0505 ms |
 
 ### 3.3. Rendimiento de Backtracking con Poda en la Red Vial de Cusco
 
 | Ruta Evaluada | Rutas Viables | Ramas Podadas por Cota | Estados Visitados | Distancia Óptima (m) | Tiempo (ms) |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| Plaza de Armas $\to$ San Pedro (N01 $\to$ N04) | 4 | **24** | 64 | 590.20 m | 0.133 ms |
-| San Blas $\to$ Wanchaq (N02 $\to$ N11) | 3 | **16** | 39 | 1,653.35 m | 0.047 ms |
-| Plaza de Armas $\to$ UNSAAC (N01 $\to$ N15) | 4 | **39** | 120 | 3,449.22 m | 0.128 ms |
-| Santiago $\to$ San Sebastián (N05 $\to$ N19) | 9 | **286** | 947 | 6,778.84 m | 0.936 ms |
+| Plaza de Armas $\to$ San Pedro (N01 $\to$ N04) | 1 | **1** | 448 | 790.80 m | 0.644 ms |
+| San Blas $\to$ Wanchaq (N02 $\to$ N11) | 1 | **10** | 20 | 1,778.62 m | 0.024 ms |
+| Plaza de Armas $\to$ UNSAAC (N01 $\to$ N15) | 2 | **40** | 142 | 4,524.34 m | 0.370 ms |
+| Santiago $\to$ San Sebastián (N05 $\to$ N19) | 7 | **269** | 955 | 9,034.33 m | 0.935 ms |
 
 **Análisis de Poda:**
-En la ruta más larga (Santiago a San Sebastián), la poda evitó explorar **286 ramas inviables**, resolviendo un trayecto de 9 tramos en menos de **1 milisegundo** (0.936 ms).
+En la ruta más larga (Santiago a San Sebastián), la poda evitó explorar **269 ramas**, resolviendo un trayecto de 9 conexiones en **0.935 ms**. El grafo dirigido y los pesos son los del cache vial actual.
+
+### 3.4. Comparación antes y después del cambio de modelo
+
+Para las mismas ocho entregas de la corrida de referencia, el modelo anterior usaba distancias en línea recta y el nuevo usa caminos por calles. El caso de Backtracking compara la misma consulta N01→N15; los tiempos son mediciones puntuales del hardware y no una garantía:
+
+| Métrica | Modelo anterior: línea recta | Modelo actual: red vial |
+| :--- | ---: | ---: |
+| Greedy, 8 destinos | 4,591.81 m | 9,474.50 m |
+| Óptimo Held-Karp, 8 destinos | 4,089.09 m | 7,608.16 m |
+| Backtracking N01→N15 | 3,449.22 m / 1.181 ms | 4,524.34 m / 0.370 ms |
+
+La distancia aumenta porque el nuevo costo suma tramos transitables y contempla direcciones; no es una regresión algorítmica ni se compara como si ambos modelos midieran lo mismo.
 
 ---
 
@@ -212,11 +235,13 @@ En la ruta más larga (Santiago a San Sebastián), la poda evitó explorar **286
 
 ## 5. Casos de Prueba Verificados con Pytest
 
-La suite automatizada cuenta con **23 pruebas unitarias deterministas** (`pytest -v`), todas aprobadas con 100% de éxito:
+La suite automatizada cuenta actualmente con **31 pruebas** (`pytest -v`), todas aprobadas en la validación documentada:
 1. `test_mochila_caso_clasico_libro`: Verifica que ante ítems con pesos [1, 2, 3] y valores [15, 10, 30] con $W=4$, la PD selecciona exactamente los ítems 1 y 3 (Valor óptimo = 45), descartando la decisión miope voraz.
 2. `test_held_karp_tsp_triangulo_retorno`: Comprueba el ciclo exacto cerrado en un triángulo de 3 nodos en Cusco.
 3. `test_backtracking_con_calle_bloqueada`: Confirma que al bloquear la vía principal en un grafo diamante, el algoritmo halla la vía alterna y actualiza la ruta óptima.
 4. `test_particion_tamanios_menores_o_iguales_a_k`: Garantiza que la segmentación recursiva espacial conserve todos los pedidos sin duplicados ni pérdidas y respete el umbral $K$.
+5. Pruebas de grafo: validan el Dijkstra manual frente a un óptimo conocido, la conectividad fuerte, la desigualdad triangular de la matriz, la geometría de extremos y la invalidación de rutas al cerrar una conexión.
+6. Pruebas de Held-Karp y Greedy con costos asimétricos para confirmar que se respeta el sentido de circulación.
 
 ---
 

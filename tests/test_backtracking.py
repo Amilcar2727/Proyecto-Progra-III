@@ -26,10 +26,10 @@ def grafo_diamante():
     g.agregar_nodo(Nodo("N03", "Paso Sur Corto", -13.5170, -71.9760, "Zona"))
     g.agregar_nodo(Nodo("N04", "Destino", -13.5180, -71.9720, "Zona"))
 
-    g.agregar_arista("N01", "N02")
-    g.agregar_arista("N02", "N04")
-    g.agregar_arista("N01", "N03")
-    g.agregar_arista("N03", "N04")
+    g.agregar_arista("N01", "N02", 6.0)
+    g.agregar_arista("N02", "N04", 6.0)
+    g.agregar_arista("N01", "N03", 2.0)
+    g.agregar_arista("N03", "N04", 3.0)
     return g
 
 
@@ -41,6 +41,7 @@ def test_backtracking_dos_rutas_y_optima(grafo_diamante):
 
     # La ruta por N03 es más corta que por N02
     assert res.ruta_optima[0] == ["N01", "N03", "N04"]
+    assert res.ruta_optima[1] == 5.0
     assert res.rutas_encontradas[0][0] == ["N01", "N03", "N04"]
     assert res.rutas_encontradas[1][0] == ["N01", "N02", "N04"]
 

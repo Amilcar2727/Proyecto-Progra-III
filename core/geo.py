@@ -4,7 +4,7 @@ Implementación matemática de la fórmula de Haversine para distancias ortodró
 """
 
 import math
-from typing import Tuple
+from typing import Iterable, Tuple
 
 # Radio medio de la Tierra en metros (WGS84 aproximado)
 RADIO_TIERRA_METROS = 6371000.0
@@ -53,3 +53,19 @@ def centroide(puntos: list[Tuple[float, float]]) -> Tuple[float, float]:
     sum_lon = sum(p[1] for p in puntos)
     n = len(puntos)
     return (sum_lat / n, sum_lon / n)
+
+
+def nodo_mas_cercano_haversine(
+    lat: float, lon: float, nodos: Iterable
+) -> Tuple[str, float]:
+    """Asigna coordenadas a un nodo de interés por proximidad geográfica."""
+    menor_id = None
+    menor_distancia = float("inf")
+    for nodo in nodos:
+        distancia = distancia_haversine(lat, lon, nodo.lat, nodo.lon)
+        if distancia < menor_distancia:
+            menor_id = nodo.id
+            menor_distancia = distancia
+    if menor_id is None:
+        raise ValueError("No hay nodos de interés disponibles para asignar el punto.")
+    return menor_id, menor_distancia

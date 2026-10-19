@@ -8,7 +8,8 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Callable, Dict, List, Optional, Tuple
 import config
-from core.modelos import Arista, Grafo, Nodo
+from core.grafo import geometria_de_ruta
+from core.modelos import Grafo
 
 try:
     import tkintermapview
@@ -67,6 +68,7 @@ class ComponenteMapa(ttk.Frame):
                 mapa.pack(fill=tk.BOTH, expand=True)
                 self.widget_mapa = mapa
                 self.modo_fallback = False
+                self._mostrar_atribucion_osm()
                 return
             except Exception as e:
                 print(f"[Aviso] No se pudo iniciar TkinterMapView ({e}). Usando CanvasFallback.")
@@ -77,6 +79,16 @@ class ComponenteMapa(ttk.Frame):
             self.widget_mapa.add_left_click_map_command(self.al_hacer_clic_mapa)
         self.widget_mapa.pack(fill=tk.BOTH, expand=True)
         self.modo_fallback = True
+        self._mostrar_atribucion_osm()
+
+    def _mostrar_atribucion_osm(self):
+        ttk.Label(
+            self,
+            text="© OpenStreetMap contributors",
+            font=("Segoe UI", 8),
+            foreground="#475569",
+            anchor="e",
+        ).pack(side=tk.BOTTOM, fill=tk.X, padx=6)
 
     def cambiar_proveedor_tiles(self, url_tile: str):
         """Cambia entre OpenStreetMap y Google Tiles."""
@@ -139,12 +151,14 @@ class ComponenteMapa(ttk.Frame):
 
         # 1. Dibujar aristas
         for arista in self.grafo.todas_las_aristas():
-            u = self.grafo.nodos[arista.origen_id]
-            v = self.grafo.nodos[arista.destino_id]
             color = config.COLOR_CALLE_BLOQUEADA if not arista.activa else config.COLOR_CALLE_NORMAL
             ancho = 4 if not arista.activa else 2
 
-            puntos = [(u.lat, u.lon), (v.lat, v.lon)]
+            puntos = arista.geometria
+            if len(puntos) < 2:
+                raise ValueError(
+                    f"El arco {arista.origen_id}->{arista.destino_id} no tiene geometría vial."
+                )
 
             def _click_handler(path, u_id=arista.origen_id, v_id=arista.destino_id):
                 if self.al_hacer_clic_arista:
@@ -157,7 +171,7 @@ class ComponenteMapa(ttk.Frame):
                 command=_click_handler,
                 data=(arista.origen_id, arista.destino_id),
             )
-            par_clave = tuple(sorted([arista.origen_id, arista.destino_id]))
+            par_clave = (arista.origen_id, arista.destino_id)
             self.caminos_grafo_dict[par_clave] = path_obj
 
         # 2. Dibujar nodos
@@ -185,10 +199,7 @@ class ComponenteMapa(ttk.Frame):
         if not self.grafo or len(secuencia_nodos) < 2:
             return
 
-        puntos = []
-        for nid in secuencia_nodos:
-            if nid in self.grafo.nodos:
-                puntos.append((self.grafo.nodos[nid].lat, self.grafo.nodos[nid].lon))
+        puntos = geometria_de_ruta(self.grafo, secuencia_nodos)
 
         if len(puntos) >= 2:
             path_obj = self.widget_mapa.set_path(

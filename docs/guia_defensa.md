@@ -1,4 +1,4 @@
-# GUÍA DE DEFENSA ORAL Y SUSTENTACIÓN ANTE JURADO
++# GUÍA DE DEFENSA ORAL Y SUSTENTACIÓN ANTE JURADO
 ## Proyecto: Sistema de Gestión de Rutas Óptimas en Cusco (Programación III - UNSAAC)
 **Objetivo:** Maximizar los 8 puntos de la rúbrica de sustentación oral mediante dominio conceptual, explicación línea por línea y resolución de preguntas trampa.
 
@@ -8,14 +8,22 @@
 
 | Minuto | Pestaña / Vista | Acción a Realizar | Explicación Verbal al Jurado |
 | :---: | :---: | :--- | :--- |
-| **0:00 - 0:45** | `🗺️ Red Vial Cusco` | Mostrar el mapa con los 20 nodos y 28 aristas. Hacer clic en una arista (ej. Plaza de Armas - Coricancha) para pintarla de rojo (bloqueada). | *"Buenos días, docentes. Diseñamos un grafo conexo de 20 nodos representativos de Cusco con distancias reales Haversine. La app cuenta con fallback offline y control dinámico de cortes viales."* |
+| **0:00 - 0:45** | `🗺️ Red Vial Cusco` | Mostrar el mapa con los 20 lugares y 64 arcos dirigidos del cache. Hacer clic en una conexión para pintarla de rojo (bloqueada). | *"Buenos días, docentes. Los 20 lugares son los vértices; cada arco representa una polilínea por calles de OpenStreetMap y pesa la longitud real de red en metros. La app conserva el control de cierres y el fallback offline."* |
 | **0:45 - 1:30** | `📦 Pedidos` | Mostrar la tabla con 30 pedidos. Cambiar el criterio a 'Prioridad' y ejecutar **Merge Sort**; luego por 'Valor' con **Quick Sort**. Buscar un ID con Búsqueda Binaria. | *"Implementamos Merge Sort y Quick Sort a mano en O(n log n). La búsqueda por ID se resuelve en O(1) con hash y en O(log n) mediante búsqueda binaria manual sobre la lista ordenada."* |
-| **1:30 - 2:30** | `⚡ Greedy` | Partir de Plaza de Armas con 8 pedidos y presionar 'Calcular Ruta Voraz'. Luego asignar un pedido de emergencia. | *"El algoritmo voraz elige en cada parada el vecino más próximo en O(n²). Es instantáneo (0.05 ms). La asignación urgente evalúa en O(R) la distancia y capacidad del repartidor."* |
+| **1:30 - 2:30** | `⚡ Greedy` | Partir de Plaza de Armas con 8 pedidos y presionar 'Calcular Ruta Voraz'. Luego asignar un pedido de emergencia. | *"El algoritmo voraz elige en cada parada el destino pendiente de menor distancia por calles, consultando la matriz de Dijkstra, en O(n²). La asignación urgente evalúa en O(R) la distancia y capacidad del repartidor."* |
 | **2:30 - 3:30** | `🧠 Prog. Dinámica` | Subpestaña Mochila: calcular carga con 25 kg y mostrar la matriz $DP[i][w]$. Pasar a Held-Karp y ejecutar $N=10$. | *"En Mochila 0/1 aplicamos la ecuación de Bellman en O(N·W) reconstruyendo el subconjunto óptimo. En Held-Karp usamos bitmask con memoización en O(n² 2ⁿ) para hallar el TSP matemáticamente exacto, sin congelar la GUI gracias a multihilo."* |
-| **3:30 - 4:15** | `🔍 Backtracking` | Elegir San Blas $\to$ Wanchaq. Presionar 'Explorar'. Ver cómo podó 16 ramas. Bloquear la calle intermedia en el mapa y ver cómo halla la ruta alterna. | *"Backtracking genera todas las rutas simples mediante DFS. Implementamos poda por cota superior (Branch and Bound): si el costo acumulado supera a la mejor distancia ya hallada, corta la rama."* |
-| **4:15 - 5:00** | `📊 Comparación Big-O` | Mostrar las curvas de tiempo logarítmico y gap de calidad con gráficos reales de Matplotlib. | *"Nuestros benchmarks empíricos demuestran que Greedy es hasta 174 veces más rápido, pero Held-Karp ahorra un 14.8% en distancia. Greedy se prefiere en tiempo real masivo; PD cuando el óptimo de combustible es crítico."* |
+| **3:30 - 4:15** | `🔍 Backtracking` | Elegir San Blas $\to$ Wanchaq. Presionar 'Explorar'. Bloquear una conexión en el mapa y observar la ruta alternativa. | *"Backtracking explora caminos simples en el grafo dirigido de lugares. La poda Branch and Bound compara costos acumulados en metros de red; los cierres desactivan la conexión en ambos sentidos cuando existe su inversa."* |
+| **4:15 - 5:00** | `📊 Comparación Big-O` | Mostrar las curvas de tiempo y calidad de ruta con gráficos reales de Matplotlib. | *"En la corrida actual para 12 destinos, Greedy tardó 0.025 ms y Held-Karp 40.428 ms; el óptimo ahorró 15.84% de distancia. Son mediciones sobre calles y el compromiso es calidad frente a costo exponencial."* |
 
 ---
+
+### El modelo de datos y sus límites
+
+- `tools/construir_red_vial.py` descarga y procesa la red vial offline. La GUI solo lee `data/red_vial_cache.json`; OSMnx y NetworkX son dependencias de desarrollo, no de ejecución.
+- El cache actual tiene 20 nodos y 64 arcos dirigidos, ponderados por longitud OSM. Dijkstra manual precalcula la matriz de distancias mínimas; por eso A→B no tiene que costar lo mismo que B→A.
+- La línea recta se conserva como métrica de comparación: el factor de desvío de un arco es longitud por calles / Haversine. El promedio del cache actual es 1.646×.
+- El cache es un snapshot de OSM del 19 de octubre de 2026. Ocho lugares quedaron a más de 60 m del nodo vial ajustado más cercano; sus posiciones originales no se cambiaron. Confirma manualmente los snaps listados en `data/red_vial_cache.json`.
+- El cierre de la GUI actúa sobre la conexión entre dos lugares de interés, no sobre un tramo OSM aislado. El perfil `drive` representa circulación vehicular, no restricciones peatonales. Atribución: © OpenStreetMap contributors (ODbL).
 
 ## 2. Explicación Módulo por Módulo y Líneas Clave
 
@@ -29,12 +37,13 @@
 - **Complejidad:** Merge Sort: $O(n \log n)$ tiempo, $O(n)$ espacio. Quick Sort: $O(n \log n)$ promedio, $O(\log n)$ espacio de pila.
 
 ### B. Algoritmo Greedy - Vecino Cercano (`core/greedy.py`)
-- **Cómo funciona:** Desde el nodo actual, calcula la distancia Haversine a todos los pendientes en una pasada y extrae el mínimo con `pendientes.pop(mejor_idx)`.
-- **Líneas Clave:** El bucle `for idx, p in enumerate(pendientes): dist = distancia_haversine(...); if dist < mejor_dist: ...` y la actualización `pos_actual_lat = siguiente_pedido.lat`.
+- **Cómo funciona:** Desde el nodo actual, consulta para cada pedido pendiente la distancia mínima por calles desde la matriz dirigida calculada con Dijkstra y extrae el mínimo con `pendientes.pop(mejor_idx)`.
+- **Líneas Clave:** El bucle de búsqueda compara el costo de red entre los identificadores de nodo; al avanzar, actualiza el nodo actual, no una coordenada euclidiana.
 - **Complejidad:** $\sum_{i=1}^n i = O(n^2)$ tiempo, $O(n)$ espacio.
 
 ### C. Divide y Vencerás (`core/divide_venceras.py`)
 - **Cómo funciona:** Particiona el conjunto 2D alternando latitud (niveles pares) y longitud (niveles impares) cortando por la mediana. Al llegar a $\le K$ pedidos, resuelve la zona y luego enlaza centroides.
+- Haversine solo determina la partición espacial; el orden y las conexiones entre pedidos se valoran con distancias por calles.
 - **Líneas Clave:** `if profundidad % 2 == 0: quick_sort(pedidos, key=lambda p: p.lat)` y la división recursiva `particionar_pedidos_dyv(sub_izq) + particionar_pedidos_dyv(sub_der)`.
 - **Complejidad:** $T(n) = 2T(n/2) + O(n) \implies O(n \log n)$ por Teorema Maestro Caso 2.
 
@@ -51,6 +60,7 @@
 
 ### E. Programación Dinámica: Held-Karp TSP (`core/prog_dinamica.py`)
 - **Cómo funciona:** Utiliza una máscara de bits `mask` (donde el bit $k$ encendido significa que el nodo $k$ fue visitado) y el último nodo $u$. Memoiza `memo[mask][u]`.
+- La matriz de costos es dirigida y puede ser asimétrica. Cada transición usa el costo de red de $u$ hacia $v$; no se infiere el costo inverso.
 - **Líneas Clave:**
   - Verificación de bit: `if not (mask & (1 << v)):` (el nodo $v$ no ha sido visitado).
   - Transición y memoización: `nueva_mascara = mask | (1 << v); costo = dist[u][v] + _resolver_dp(nueva_mascara, v)`.
@@ -87,3 +97,12 @@
 
 ### Pregunta 7: "¿Cómo garantizas que la aplicación funcione si el docente apaga el Wi-Fi durante la sustentación?"
 > **Respuesta:** *"Implementamos una arquitectura resiliente con el widget `CanvasFallback`. Si `tkintermapview` no puede conectarse a los servidores de tiles de OpenStreetMap, el sistema conmuta automáticamente y sin romperse a un lienzo 2D nativo de Tkinter (`tk.Canvas`), que normaliza matemáticamente las coordenadas geográficas de Cusco a píxeles y permite interactuar con los mismos nodos, aristas y rutas."*
+
+### Pregunta 8: "¿Por qué no se usan todos los nodos de la red OSM como vértices de Held-Karp y Backtracking?"
+> **Respuesta:** *"La red vial contiene miles de nodos y haría impracticables los algoritmos combinatorios. Usamos una arquitectura híbrida: mantenemos como vértices los 20 lugares de interés y precalculamos para cada conexión seleccionada el camino vial más corto, su longitud y su polilínea. Conservamos así costos realistas con un grafo pequeño y disperso."*
+
+### Pregunta 9: "¿Cómo calculan el costo si las calles son de un solo sentido?"
+> **Respuesta:** *"El constructor descarga una red dirigida con `network_type=drive` y busca caminos respetando sus arcos. Dijkstra calcula costos A→B; el trayecto inverso se calcula independientemente y puede tener longitud distinta o no existir. Held-Karp también consume la matriz asimétrica."*
+
+### Pregunta 10: "¿Qué significa el factor de desvío y qué limitaciones tienen estos datos?"
+> **Respuesta:** *"Es la longitud de la conexión por calles dividida entre Haversine entre sus extremos. Cuantifica cuánto difiere el recorrido vial de la línea recta, pero no es un factor universal de congestión. Los datos son una descarga puntual; algunos lugares requieren validar su ajuste a la calle, los cierres afectan conexiones completas del grafo de interés y el perfil `drive` no modela recorridos peatonales."*

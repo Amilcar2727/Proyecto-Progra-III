@@ -22,6 +22,7 @@ from core.estructuras import merge_sort, quick_sort
 from core.greedy import vecino_mas_cercano
 from core.prog_dinamica import held_karp_tsp, resolver_mochila_01
 from core.backtracking import buscar_rutas_backtracking
+from core.grafo import matriz_para_nodos
 
 
 def ejecutar_benchmarks_ordenacion(tamanios: List[int] = [10, 20, 30]) -> Dict[str, Any]:
@@ -70,11 +71,11 @@ def ejecutar_benchmarks_tsp(valores_n: List[int] = [3, 5, 8, 10, 12]) -> Dict[st
 
     for n in valores_n:
         sub_pedidos = pedidos_base[:n]
-        coords = [(p.lat, p.lon) for p in sub_pedidos]
+        matriz = matriz_para_nodos(grafo, [p.nodo_id for p in sub_pedidos])
         origen_id = sub_pedidos[0].nodo_id
 
         # 1. Held-Karp (Óptimo)
-        idx_hk, dist_hk, t_hk = held_karp_tsp(coords, retornar_al_inicio=True)
+        idx_hk, dist_hk, t_hk = held_karp_tsp(matriz, retornar_al_inicio=True)
 
         # 2. Greedy (Heurística Voraz)
         ruta_gr = vecino_mas_cercano(
