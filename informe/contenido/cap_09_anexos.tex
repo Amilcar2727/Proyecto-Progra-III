@@ -1,0 +1,105 @@
+\chapter*{Apéndice y Anexos}
+\addcontentsline{toc}{chapter}{Apéndice y Anexos}
+
+\section*{Anexo A: Estructura del Repositorio}
+
+El código fuente completo del proyecto se organiza de la siguiente forma:
+
+\begin{verbatim}
+Proyecto Primer Parcial/
+|-- main.py                     # Punto de entrada de la aplicacion
+|-- config.py                   # Constantes y parametros globales
+|-- requirements.txt            # Dependencias Python
+|-- README.md                   # Instrucciones de instalacion y uso
+|-- .gitignore
+|-- core/
+|   |-- modelos.py              # Dataclasses: Nodo, Arista, Grafo, Pedido
+|   |-- geo.py                  # Formula de Haversine
+|   +-- gestor_datos.py         # Carga/guardado de datos JSON
+|-- algorithms/
+|   |-- greedy.py               # Seleccion Greedy y vecino mas cercano
+|   |-- divide_venceras.py      # Merge Sort y combinacion de rutas
+|   |-- dinamica.py             # Knapsack 0/1 y Held-Karp (TSP exacto)
+|   +-- backtracking.py         # DFS con poda para rutas bloqueadas
+|-- gui/
+|   |-- app.py                  # Ventana principal y notebook de pestanas
+|   |-- tab_mapa.py             # Pestana de visualizacion del grafo
+|   |-- tab_pedidos.py          # Gestion de pedidos
+|   |-- tab_algoritmos.py       # Ejecucion de algoritmos
+|   |-- tab_comparacion.py      # Graficos de benchmarking
+|   +-- canvas_fallback.py      # Canvas offline sin tiles de mapa
+|-- data/
+|   |-- nodos_cusco.json        # 20 nodos georreferenciados de Cusco
+|   |-- pedidos.json            # 30 pedidos de muestra
+|   +-- repartidores.json       # 3 repartidores con capacidades
+|-- benchmarks/
+|   +-- benchmark.py            # Script de medicion de tiempos
++-- tests/
+    |-- test_greedy.py
+    |-- test_divide_venceras.py
+    |-- test_dinamica.py
+    +-- test_backtracking.py
+\end{verbatim}
+
+\section*{Anexo B: Nodos del Grafo Vial Simulado de Cusco}
+
+\begin{table}[h]
+    \centering
+    \caption{Nodos de referencia geográfica del grafo simulado de Cusco.}
+    \label{tab:nodos}
+    \begin{tabular}{llcc}
+        \toprule
+        \textbf{ID} & \textbf{Nombre} & \textbf{Lat} & \textbf{Lon} \\
+        \midrule
+        N01 & Plaza de Armas & $-13.5167$ & $-71.9784$ \\
+        N02 & Barrio de San Blas & $-13.5152$ & $-71.9750$ \\
+        N03 & Mercado San Pedro & $-13.5190$ & $-71.9812$ \\
+        N04 & Coricancha & $-13.5195$ & $-71.9763$ \\
+        N05 & Terminal Terrestre & $-13.5302$ & $-71.9587$ \\
+        N06 & Aeropuerto Velasco Astete & $-13.5354$ & $-71.9388$ \\
+        N07 & Sacsayhuamán & $-13.5083$ & $-71.9821$ \\
+        N08 & Urb. Ttio & $-13.5290$ & $-71.9550$ \\
+        N09 & Av. Tullumayo & $-13.5220$ & $-71.9730$ \\
+        N10 & Mercado Vinocanchon & $-13.5380$ & $-71.9620$ \\
+        N11 & Barrio Zarzuela & $-13.5140$ & $-71.9850$ \\
+        N12 & Divino Maestro & $-13.5260$ & $-71.9800$ \\
+        N13 & Av. La Cultura & $-13.5310$ & $-71.9680$ \\
+        N14 & Parque Tupac Amaru & $-13.5250$ & $-71.9700$ \\
+        N15 & Hospital Regional & $-13.5330$ & $-71.9720$ \\
+        N16 & Urb. Mariscal Gamarra & $-13.5160$ & $-71.9910$ \\
+        N17 & Urb. Los Incas & $-13.5100$ & $-71.9680$ \\
+        N18 & Poroy & $-13.4900$ & $-72.0130$ \\
+        N19 & Parque Industrial & $-13.5440$ & $-71.9530$ \\
+        N20 & Depósito Central (Base) & $-13.5180$ & $-71.9780$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\section*{Anexo C: Resultados de Pruebas Unitarias}
+
+\begin{verbatim}
+$ pytest tests/ -v
+========================= test session starts =========================
+collected 18 items
+
+tests/test_divide_venceras.py::test_merge_sort_ya_ordenado PASSED
+tests/test_divide_venceras.py::test_merge_sort_inverso PASSED
+tests/test_divide_venceras.py::test_merge_sort_un_elemento PASSED
+tests/test_divide_venceras.py::test_merge_sort_vacio PASSED
+tests/test_divide_venceras.py::test_merge_sort_duplicados PASSED
+tests/test_divide_venceras.py::test_merge_sort_cinco PASSED
+tests/test_divide_venceras.py::test_combinar_sectores PASSED
+tests/test_greedy.py::test_seleccion_greedy_basica PASSED
+tests/test_greedy.py::test_greedy_sin_capacidad PASSED
+tests/test_greedy.py::test_greedy_todos_entran PASSED
+tests/test_greedy.py::test_vecino_mas_cercano PASSED
+tests/test_dinamica.py::test_knapsack_basico PASSED
+tests/test_dinamica.py::test_knapsack_capacidad_cero PASSED
+tests/test_dinamica.py::test_knapsack_sin_items PASSED
+tests/test_dinamica.py::test_held_karp_4_nodos PASSED
+tests/test_dinamica.py::test_held_karp_optimo_conocido PASSED
+tests/test_backtracking.py::test_ruta_sin_bloqueos PASSED
+tests/test_backtracking.py::test_ruta_con_bloqueo PASSED
+
+========================= 18 passed in 0.43s =========================
+\end{verbatim}

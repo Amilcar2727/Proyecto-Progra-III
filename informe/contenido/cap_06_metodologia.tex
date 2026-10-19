@@ -1,0 +1,58 @@
+\chapter{Metodología de la Investigación}
+
+En este capítulo se describe el enfoque metodológico adoptado y el procedimiento seguido para el diseño, implementación, verificación y evaluación del sistema de gestión de rutas óptimas.
+
+\section{Tipo de Investigación}
+
+El trabajo se enmarca en una investigación de tipo \textbf{aplicada y experimental}. Es aplicada porque se orienta a resolver un problema concreto —la optimización de rutas de reparto en el contexto urbano de Cusco— mediante la aplicación de conocimientos teóricos de algoritmia. Es experimental porque se diseñaron y ejecutaron experimentos controlados (\textit{benchmarks}) para medir el comportamiento empírico de cada algoritmo bajo condiciones variables, y se compararon los resultados con las predicciones teóricas de la notación Big-O.
+
+\section{Proceso Metodológico}
+
+El desarrollo del sistema se organizó en cuatro fases secuenciales:
+
+\subsection{Fase 1: Diseño de la Arquitectura}
+
+Se definió la estructura modular del proyecto, separando claramente las responsabilidades en los siguientes módulos: \texttt{core/modelos.py} (estructuras de datos: nodos, aristas, pedidos, repartidores), \texttt{core/geo.py} (cálculo de distancias Haversine), \texttt{core/gestor\_datos.py} (carga/guardado de datos JSON), \texttt{algorithms/} (implementaciones algorítmicas independientes) y \texttt{gui/} (interfaz gráfica). Se modeló el grafo vial de Cusco con 20 nodos de referencia geográfica real, definiendo coordenadas aproximadas para puntos de interés como la Plaza de Armas, Mercado San Pedro, Sacsayhuamán y el aeropuerto de Velasco Astete, entre otros. Las aristas del grafo se definieron manualmente reflejando la conectividad vial aproximada entre zonas. Los 30 pedidos de muestra se crearon con coordenadas dentro de la malla definida, pesos y volúmenes variados, y tres niveles de prioridad.
+
+\subsection{Fase 2: Implementación Algorítmica}
+
+Se implementaron los cuatro paradigmas algorítmicos en el directorio \texttt{algorithms/}, con las siguientes convenciones de diseño:
+\begin{itemize}
+    \item Cada módulo es autónomo: no depende de otros módulos del proyecto excepto de \texttt{core/modelos.py}.
+    \item Las funciones principales están completamente documentadas con \textit{docstrings} que incluyen descripción del algoritmo, parámetros, valor de retorno, y análisis de complejidad.
+    \item No se utilizaron librerías de optimización externas (\texttt{scipy}, \texttt{networkx} o similares); toda la lógica algorítmica es implementación propia.
+\end{itemize}
+
+Los módulos implementados fueron:
+\begin{itemize}
+    \item \texttt{algorithms/greedy.py}: selección de pedidos por densidad y construcción de ruta por vecino más cercano.
+    \item \texttt{algorithms/divide\_venceras.py}: Merge Sort sobre listas de pedidos y función de combinación de rutas por sectores.
+    \item \texttt{algorithms/dinamica.py}: Knapsack 0/1 con tabulación y Held-Karp con memoización sobre bitmask.
+    \item \texttt{algorithms/backtracking.py}: búsqueda DFS con poda de ciclos y longitud máxima para rutas alternativas en grafos con aristas bloqueadas.
+\end{itemize}
+
+\subsection{Fase 3: Construcción de la Interfaz Gráfica}
+
+La GUI se construyó con el módulo estándar \texttt{tkinter} de Python 3.10+, organizada en pestañas funcionales mediante \texttt{ttk.Notebook}:
+\begin{itemize}
+    \item \textbf{Pestaña Mapa}: visualización del grafo vial en canvas Tkinter con marcadores de nodos, aristas y rutas resultantes.
+    \item \textbf{Pestaña Pedidos}: tabla de pedidos activos, filtros por sector y prioridad, y selección del repartidor.
+    \item \textbf{Pestaña Algoritmos}: panel de control para ejecutar cada paradigma con parámetros configurables (capacidad, bloqueos).
+    \item \textbf{Pestaña Comparación}: gráficos de barras y líneas generados con \texttt{matplotlib} que comparan tiempos de ejecución y longitudes de ruta de los cuatro algoritmos.
+\end{itemize}
+
+Se implementó además un modo fallback que utiliza un canvas Tkinter nativo cuando no hay conexión a internet, garantizando que la aplicación sea ejecutable sin acceso a los tiles de OpenStreetMap.
+
+\subsection{Fase 4: Verificación y Benchmarking}
+
+Se redactaron pruebas unitarias en \texttt{tests/} usando \texttt{pytest} para verificar la correctitud de cada algoritmo sobre casos conocidos: Knapsack con solución óptima computable manualmente, Merge Sort sobre listas desordenadas, Held-Karp sobre grafos de 4 y 5 nodos con distancia óptima conocida, y Backtracking sobre un grafo con calles bloqueadas donde la ruta alternativa es única. El módulo \texttt{benchmarks/benchmark.py} ejecutó cada algoritmo variando el número de pedidos activos de 3 a 15 y registró los tiempos de ejecución usando \texttt{time.perf\_counter()} con tres repeticiones por configuración para reducir la varianza. Los resultados se guardaron en formato CSV para su posterior graficación.
+
+\section{Instrumentos y Entorno de Desarrollo}
+
+\begin{itemize}
+    \item Lenguaje: Python 3.10.
+    \item IDE: Visual Studio Code con extensión Python.
+    \item Control de versiones: Git y GitHub.
+    \item Dependencias externas: \texttt{matplotlib} (graficación de benchmarks), \texttt{Pillow} (manejo de imágenes en GUI), \texttt{tkintermapview} (tiles de mapa opcionales), \texttt{pytest} (pruebas unitarias).
+    \item Hardware de prueba: procesador Intel Core i5-1135G7 @ 2.40 GHz, 8 GB RAM, sistema operativo Windows 11.
+\end{itemize}

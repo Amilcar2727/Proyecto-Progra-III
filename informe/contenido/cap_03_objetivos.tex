@@ -1,0 +1,14 @@
+\chapter{Objetivos de la Investigación}
+\label{ch:objetivos_ph}
+
+\section{Objetivo General}
+
+Diseñar e implementar un sistema de escritorio en Python que gestione pedidos de reparto y genere rutas óptimas en un grafo vial simulado de la ciudad del Cusco, integrando y comparando cuatro paradigmas algorítmicos —Greedy, Divide y Vencerás, Programación Dinámica y Backtracking— mediante análisis de complejidad Big-O y benchmarks empíricos, con el fin de determinar el paradigma más adecuado según el tamaño del problema y las restricciones operativas.
+
+\section{Objetivos Específicos}
+
+\begin{itemize}
+    \item Implementar desde cero los algoritmos Greedy de selección por densidad, Merge Sort (Divide y Vencerás), Knapsack 0/1 y Held-Karp (Programación Dinámica), y Backtracking con poda de calles bloqueadas, verificando su correctitud mediante pruebas unitarias con \texttt{pytest}.
+    \item Derivar y documentar la complejidad temporal y espacial Big-O de cada algoritmo implementado, comparando el crecimiento teórico con los tiempos de ejecución medidos experimentalmente para entre 3 y 15 pedidos activos.
+    \item Desarrollar una interfaz gráfica de usuario (GUI) con Tkinter que permita visualizar el grafo vial, gestionar pedidos y repartidores, ejecutar cada algoritmo de forma interactiva, y presentar los resultados de comparación en gráficos de rendimiento.
+\end{itemize}

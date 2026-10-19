@@ -1,0 +1,26 @@
+[
+  {
+    "id": "REP-01",
+    "nombre": "Carlos Quispe (Bicicleta)",
+    "tipo_vehiculo": "Bicicleta",
+    "nodo_inicio_id": "N01",
+    "cap_peso_kg": 15.0,
+    "cap_vol_l": 25.0
+  },
+  {
+    "id": "REP-02",
+    "nombre": "Ana Mendoza (Motocicleta)",
+    "tipo_vehiculo": "Motocicleta",
+    "nodo_inicio_id": "N10",
+    "cap_peso_kg": 35.0,
+    "cap_vol_l": 55.0
+  },
+  {
+    "id": "REP-03",
+    "nombre": "Víctor Huamán (Furgoneta Eco)",
+    "tipo_vehiculo": "Furgoneta",
+    "nodo_inicio_id": "N18",
+    "cap_peso_kg": 90.0,
+    "cap_vol_l": 160.0
+  }
+]

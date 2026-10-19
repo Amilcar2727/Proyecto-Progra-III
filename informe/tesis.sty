@@ -1,0 +1,309 @@
+%*****************************************************************************
+%Definiendo Paquetes
+%*****************************************************************************
+\RequirePackage{mathptmx} % Times New Roman en texto y fórmulas (APA7)
+\RequirePackage{setspace}
+\RequirePackage{caption}
+
+%*****************************************************************************
+% Formato general del cuerpo del documento (APA7)
+%*****************************************************************************
+\geometry{margin=2.54cm} % márgenes uniformes de 1 pulgada en los 4 lados
+\doublespacing % interlineado doble en todo el cuerpo
+
+% Formato de figuras y tablas (APA7): número en negrita en su propia línea,
+% título en cursiva en la línea siguiente, ambos arriba y alineados a la
+% izquierda. APA7 unificó este formato para figuras y tablas por igual.
+\captionsetup{
+    labelfont=bf,
+    textfont=it,
+    labelsep=newline,
+    justification=raggedright,
+    singlelinecheck=false,
+}
+\addto\captionsspanish{\renewcommand{\tablename}{Tabla}} % babel-spanish usa "Cuadro" por defecto
+
+%*****************************************************************************
+% Diseño Carátula
+%*****************************************************************************
+\newlength{\portadaskip}
+\setlength{\portadaskip}{0.3cm}
+
+\renewcommand{\maketitle}
+{
+    \thispagestyle{empty}
+    \newgeometry{inner=3.0cm,outer=2.5cm,top=1.8cm,bottom=1.8cm}% más espacio vertical solo en la portada
+    \linespread{1.05}\selectfont
+
+    \vspace*{0.6cm}% espacio fijo (no descartable) para que el título no quede pegado al margen superior
+    \vfill
+    \begin{center}
+        % Generar titulo
+        {\Large{UNIVERSIDAD NACIONAL DE SAN ANTONIO ABAD\\[0.2cm] DEL CUSCO}}\\[0.2cm]
+        FACULTAD DE INGENIER\'IA EL\'ECTRICA, ELECTR\'ONICA, INFORM\'ATICA Y MEC\'ANICA \\[0.2cm]
+        ESCUELA PROFESIONAL DE INGENIER\'IA INFORM\'ATICA Y DE SISTEMAS\\
+    \end{center}
+
+    \vfill
+    % Insertar la figura del logo (sin flotante: en una portada no debe desplazarse de lugar)
+    \begin{center}
+        \includegraphics[scale = 0.26]{figuras/escudo}
+    \end{center}
+
+    \vfill
+    \vfill
+    \begin{center}
+        % Generar titulo
+        \textbf{\large INFORME TÉCNICO -- PROYECTO DEL PRIMER PARCIAL} \\
+        \rule{156mm}{0.7mm} \\ % Generar linea Horizontal
+        {\Large \textbf \@title \par}
+        \rule{156mm}{0.7mm} \\ % Generar linea Horizontal
+    \end{center}
+
+    \vfill
+    \setlength{\tabcolsep}{7em} % for the horizontal padding
+    {\renewcommand{\arraystretch}{1.0}% for the vertical padding
+    \begin{tabular}{p{14cm}}
+
+        \textbf{Curso:} \\
+        \qquad {\large PROGRAMACIÓN III}\\
+        \vspace{\portadaskip}
+
+        \textbf{Integrantes:} \\
+        \qquad {\large \@authorone\ (\@codigoautorone)}\\
+        \ifx\@authortwo\@empty\else
+        \qquad {\large \@authortwo\ (\@codigoautortwo)}\\
+        \fi
+        \ifx\@authorthree\@empty\else
+        \qquad {\large \@authorthree\ (\@codigoauthorthree)}\\
+        \fi
+        \ifx\@authorfour\@empty\else
+        \qquad {\large \@authorfour\ (\@codigoauthorfour)}\\
+        \fi
+        \vspace{\portadaskip}
+
+        \textbf{Docente:} \\
+        \qquad {\large \@asesor}\\
+        \ifx\@coasesor\@empty\else
+        \vspace{\portadaskip}
+        \textbf{Co-docente:} \\
+        \qquad {\large \@coasesor}\\
+        \fi
+        \vspace{\portadaskip}
+
+    \end{tabular}
+    }
+
+    \vfill
+    \begin{center}
+        \textbf{Perú, $\,$\mes\ de\ \the\year$\,$ } \\
+    \end{center}
+    \vfill
+
+    \restoregeometry% recupera los márgenes normales para el resto del documento
+    %\pagebreak  % hacer salto de página
+    %\cleardoublepage % crear página en blanco
+}
+
+%***************************************************************************** 
+%Diseí±ando Asesor 
+%***************************************************************************** 
+\newcommand{\asesor}{\gdef\@asesor}
+\newcommand{\coasesor}{\gdef\@coasesor}
+\newcommand{\jurado}{\gdef\@jurado}
+
+% Director de tesis y jurado (dictaminantes/replicantes) para la hoja de firmas
+% del informe final: \directortesis{...}, \dictaminante1{...}/\dictaminante2{...},
+% \replicante1{...}/\replicante2{...}
+\newcommand{\directortesis}{\gdef\@directortesis}
+\gdef\@directortesis{}
+\def\dictaminante#1#2{%
+    \ifnum#1=1 \gdef\@dictaminanteuno{#2}%
+    \else\ifnum#1=2 \gdef\@dictaminantedos{#2}%
+    \else\PackageError{tesis}{Uso incorrecto de \string\dictaminante}%
+        {Escriba \string\dictaminante1{Nombre} o \string\dictaminante2{Nombre}.}%
+    \fi\fi
+}
+\gdef\@dictaminanteuno{}
+\gdef\@dictaminantedos{}
+\def\replicante#1#2{%
+    \ifnum#1=1 \gdef\@replicanteuno{#2}%
+    \else\ifnum#1=2 \gdef\@replicantedos{#2}%
+    \else\PackageError{tesis}{Uso incorrecto de \string\replicante}%
+        {Escriba \string\replicante1{Nombre} o \string\replicante2{Nombre}.}%
+    \fi\fi
+}
+\gdef\@replicanteuno{}
+\gdef\@replicantedos{}
+
+%*****************************************************************************
+%Diseñando la Hoja de Firmas (Dictaminantes, Replicantes y Director de Tesis)
+%*****************************************************************************
+\newlength{\firmaskip}
+\setlength{\firmaskip}{1.1cm}
+\newcommand{\firmabloque}[2]{%
+    \rule{7.5cm}{0.4pt}\\
+    #1\\
+    {\itshape #2}\\[\firmaskip]
+}
+\newcommand{\firmas}
+{
+    \clearpage
+    \thispagestyle{empty}
+    {\singlespacing
+    \begin{center}
+        {\large\bfseries HOJA DE APROBACIÓN}
+    \end{center}
+    \vspace{0.8cm}
+
+    \noindent
+    El presente informe final de tesis titulado \textbf{``\@title"}, presentado
+    por Br.~\@authorone\ifx\@authortwo\@empty\else\ y Br.~\@authortwo\fi\ para
+    optar al título profesional de Ingeniero Informático y de Sistemas, ha sido
+    revisado y sustentado, contando con la aprobación de los siguientes
+    dictaminantes, replicantes y director de tesis:
+
+    \vspace{1.4cm}
+    \begin{center}
+        \firmabloque{\@dictaminanteuno}{Primer Dictaminante}
+        \firmabloque{\@dictaminantedos}{Segundo Dictaminante}
+        \firmabloque{\@replicanteuno}{Primer Replicante}
+        \firmabloque{\@replicantedos}{Segundo Replicante}
+        \firmabloque{\@directortesis}{Director de Tesis}
+    \end{center}
+    }
+    \clearpage
+}
+
+% ícono ORCID (círculo verde con "iD") enlazado a la página del autor
+\newcommand{\orcidicon}{%
+    \begin{tikzpicture}[baseline=-7.3pt]
+        \definecolor{orcidgreen}{HTML}{A6CE39}
+        \fill[orcidgreen] (0,0) circle (0.19cm);
+        \node[white] at (0,0) {\fontsize{6}{6}\selectfont\bfseries iD};
+    \end{tikzpicture}%
+}
+\newcommand{\orcidlink}[1]{\href{#1}{\orcidicon}}
+
+% URL de ORCID del asesor/co-asesor (opcional): \orcidasesor{https://orcid.org/...}
+\newcommand{\orcidasesor}{\gdef\@orcidasesor}
+\gdef\@orcidasesor{}
+\newcommand{\orcidcoasesor}{\gdef\@orcidcoasesor}
+\gdef\@orcidcoasesor{}
+
+% Autor(es): \autor1{...}, \autor2{...}, \autor3{...}, \autor4{...}
+\def\autor#1#2{%
+    \ifnum#1=1 \gdef\@authorone{#2}%
+    \else\ifnum#1=2 \gdef\@authortwo{#2}%
+    \else\ifnum#1=3 \gdef\@authorthree{#2}%
+    \else\ifnum#1=4 \gdef\@authorfour{#2}%
+    \else\PackageError{tesis}{Uso incorrecto de \string\autor}%
+        {Escriba \string\autor1{Nombre}, \string\autor2{Nombre}, etc.}%
+    \fi\fi\fi\fi
+}
+\gdef\@authortwo{}
+\gdef\@authorthree{}
+\gdef\@authorfour{}
+
+% Código(s) de estudiante: \codigoautor1{...}, \codigoautor2{...}, etc.
+\def\codigoautor#1#2{%
+    \ifnum#1=1 \gdef\@codigoautorone{#2}%
+    \else\ifnum#1=2 \gdef\@codigoautortwo{#2}%
+    \else\ifnum#1=3 \gdef\@codigoauthorthree{#2}%
+    \else\ifnum#1=4 \gdef\@codigoauthorfour{#2}%
+    \else\PackageError{tesis}{Uso incorrecto de \string\codigoautor}%
+        {Escriba \string\codigoautor1{...}, etc.}%
+    \fi\fi\fi\fi
+}
+\gdef\@codigoautortwo{}
+\gdef\@codigoauthorthree{}
+\gdef\@codigoauthorfour{}
+
+
+%*****************************************************************************
+%Diseí±ando los índices
+%*****************************************************************************
+%\newif \if@listtab
+%\newif \if@listfig
+
+%\newcommand{\itb}{\@listtabtrue}
+%\newcommand{\ifg}{\@listfigtrue}
+%
+%\newcommand{\indice}[1]
+%{    
+%    #1
+%    \pagenumbering{arabic}
+%    
+%    \tableofcontents
+%    
+%    \if@listtab
+%        \listoftables
+%    \fi
+%    
+%    \if@listfig
+%        \listoffigures
+%    \fi
+%}
+
+
+%*****************************************************************************
+%Diseí±ando Encabezado y Pie de Página
+%*****************************************************************************
+\pagestyle{fancy}
+\fancyhf{} % limpia encabezado y pie: APA7 solo lleva el número de página
+\fancyhead[R]{\thepage} % número de página en la esquina superior derecha
+
+% \chapter usa por defecto el estilo "plain" en su primera página, que
+% ignora la configuración de \pagestyle{fancy}; se redefine para que
+% también muestre el número de página arriba a la derecha (APA7).
+\fancypagestyle{plain}{%
+    \fancyhf{}%
+    \fancyhead[R]{\thepage}%
+    \renewcommand{\headrulewidth}{0pt}%
+    \renewcommand{\footrulewidth}{0pt}%
+}
+
+\renewcommand{\headrulewidth}{0pt} % APA7 no lleva línea bajo el encabezado
+\renewcommand{\footrulewidth}{0pt}
+
+
+%*****************************************************************************
+%Diseí±ando Párrafos
+%*****************************************************************************
+\parindent 1.27cm % sangría de primera línea de 0.5 pulgada (APA7)
+\parskip 0pt % APA7 no agrega espacio extra entre párrafos (solo el doble espacio)
+
+%*****************************************************************************
+%Diseí±ando la Bibliografí­a
+%*****************************************************************************
+\newcommand{\bibliografia}[1]
+{
+    
+}
+
+
+%*****************************************************************************
+%Mensajes de Error
+%*****************************************************************************
+\renewcommand{\@title}{\ClassError{UCSP}{Falta especificar \string\title{}}
+ {Use el comando \string\title{} en el preambulo para especificar \MessageBreak
+  el titulo de su tesis.}}
+\renewcommand{\title}[1]{\gdef\@title{#1}}
+
+\newcommand{\@authorone}{\ClassError{UCSP}{Falta especificar \string\autor1{}}
+ {Use el comando \string\autor1{} en el preambulo para especificar su nombre.}}
+
+\newcommand{\@codigoautorone}{\ClassError{UCSP}{Falta especificar \string\codigoautor1{}}
+ {Use el comando \string\codigoautor1{} en el preambulo para especificar su c\'odigo de estudiante.}}
+
+
+%*****************************************************************************
+%Nombre de mes
+%*****************************************************************************
+\newcommand{\mes}{\ifcase\month\or Enero\or Febrero\or
+      Marzo\or Abril\or Mayo\or Junio\or Julio\or Agosto\or Septiembre\or
+      Octubre\or Noviembre\or Diciembre\fi}
+
+
+%*****************************************************************************
+\endinput

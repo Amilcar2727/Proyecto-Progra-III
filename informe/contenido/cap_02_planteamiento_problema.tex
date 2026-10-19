@@ -1,0 +1,32 @@
+\chapter{Planteamiento del Problema}
+
+\section{Descripción de la Situación Problemática}
+
+La ciudad del Cusco posee una red vial de carácter histórico que impone restricciones singulares a la movilidad urbana. Calles con ancho insuficiente para vehículos de carga, zonas de tráfico restringido en el Centro Histórico, sentidos únicos de circulación, y cierres temporales frecuentes por eventos culturales o trabajos de mantenimiento, hacen que la planificación manual de rutas de distribución sea altamente ineficiente. A esto se suma la creciente demanda de servicios de reparto a domicilio, que ha crecido de manera sostenida en los últimos años tanto en el ámbito nacional como en la región del Cusco.
+
+Las empresas y emprendimientos locales que realizan reparto de pedidos —restaurantes, farmacias, tiendas de abarrotes, comercio electrónico local— carecen, en su mayoría, de herramientas computacionales que les permitan determinar de forma sistemática qué pedidos priorizar cuando la capacidad del vehículo es limitada, y en qué orden visitarlos para minimizar el tiempo y la distancia recorrida. En la práctica, esta decisión se delega al criterio empírico del repartidor, lo que conduce a rutas subóptimas, mayor consumo de combustible, entregas tardías y reducción de la capacidad de atención diaria.
+
+Desde el punto de vista algorítmico, el problema de la selección óptima de pedidos bajo restricción de capacidad corresponde al problema de la Mochila 0/1 (\textit{Knapsack 0/1}), mientras que la determinación del orden de visita óptimo es una instancia del Problema del Viajante de Comercio (\textit{Travelling Salesperson Problem}, TSP). Ambos pertenecen a la clase de problemas NP-difíciles para los cuales la Programación Dinámica ofrece soluciones exactas de complejidad exponencial, y las heurísticas \textit{Greedy} constituyen alternativas prácticas de complejidad polinomial. La incorporación de restricciones de calles bloqueadas introduce la necesidad de técnicas de búsqueda exhaustiva como el \textit{Backtracking}, mientras que la organización y preprocesamiento de los pedidos se beneficia del paradigma \textit{Divide y Vencerás}.
+
+Este proyecto responde a la necesidad académica de contrastar empíricamente estos cuatro paradigmas sobre un caso de uso concreto y relevante localmente, analizando sus diferencias de rendimiento y calidad de solución.
+
+\section{Problema General}
+
+¿En qué medida el diseño e implementación de un sistema computacional que aplica los paradigmas algorítmicos Greedy, Divide y Vencerás, Programación Dinámica y Backtracking permite gestionar eficientemente las rutas de reparto en la ciudad del Cusco, optimizando la distancia total recorrida y el cumplimiento de restricciones operativas?
+
+\section{Problemas Específicos}
+
+El estudio toma en cuenta los siguientes problemas específicos:
+\begin{itemize}
+    \item ¿Cómo afecta la elección del paradigma algorítmico (Greedy vs. Programación Dinámica) a la calidad de la selección de pedidos bajo restricción de capacidad, medida como distancia total de la ruta generada?
+    \item ¿Cuál es la complejidad temporal y espacial real, medida empíricamente, de cada uno de los cuatro algoritmos implementados en función del número de pedidos activos?
+    \item ¿En qué condiciones del grafo vial (número de aristas bloqueadas, densidad de la red) el algoritmo de Backtracking logra encontrar rutas alternativas viables en tiempo aceptable para un usuario interactivo?
+\end{itemize}
+
+\section{Justificación}
+
+La justificación de este trabajo es de naturaleza académica y práctica. En el plano académico, el proyecto constituye una demostración integral de cuatro de los paradigmas algorítmicos más importantes del diseño de algoritmos, aplicados sobre un problema de optimización combinatoria real. La implementación desde cero de cada algoritmo —sin recurrir a librerías de optimización externas— permite a los integrantes del equipo comprender en profundidad la estructura y el comportamiento computacional de cada paradigma, lo que resulta esencial para la formación en Ingeniería Informática y de Sistemas.
+
+En el plano práctico, el sistema desarrollado demuestra que es posible construir, con recursos computacionales modestos y en Python, una herramienta de apoyo a la decisión logística para pequeñas y medianas empresas de reparto en Cusco. Si bien el grafo vial utilizado es una simulación con 20 nodos de referencia geográfica real, la arquitectura modular del sistema permite su extensión futura con datos reales obtenidos de OpenStreetMap.
+
+La comparación cuantitativa entre algoritmos, respaldada por \textit{benchmarks} empíricos y análisis Big-O, añade valor pedagógico al permitir visualizar de forma directa la diferencia entre complejidad polinomial y exponencial en un contexto aplicado.

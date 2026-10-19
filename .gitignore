@@ -1,0 +1,49 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches de pruebas y entorno
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Entornos virtuales
+venv/
+env/
+ENV/
+.env
+
+# Archivos de configuración de IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos auxiliares de compilación LaTeX (en informe/)
+informe/*.aux
+informe/*.bbl
+informe/*.blg
+informe/*.fdb_latexmk
+informe/*.fls
+informe/*.glg
+informe/*.glo
+informe/*.gls
+informe/*.idx
+informe/*.ilg
+informe/*.ind
+informe/*.ist
+informe/*.lof
+informe/*.log
+informe/*.lot
+informe/*.nav
+informe/*.out
+informe/*.snm
+informe/*.synctex.gz
+informe/*.toc
+informe/*.vrb
+informe/contenido/*.aux
+
+# Mantener PDF compilado y figuras
+!informe/main.pdf
+!informe/figuras/*

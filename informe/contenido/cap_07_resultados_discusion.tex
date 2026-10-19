@@ -1,0 +1,131 @@
+\chapter{Resultados y Discusión}
+
+\section{Resultados}
+
+\subsection{Análisis de Complejidad Teórica}
+
+La Tabla \ref{tab:complejidad} sintetiza la complejidad temporal y espacial Big-O de cada algoritmo implementado, derivada en el Capítulo 4.
+
+\begin{table}[h]
+    \centering
+    \caption{Complejidad Big-O de los algoritmos implementados.}
+    \label{tab:complejidad}
+    \begin{tabular}{llll}
+        \toprule
+        \textbf{Algoritmo} & \textbf{Paradigma} & \textbf{Tiempo} & \textbf{Espacio} \\
+        \midrule
+        Greedy por densidad & Greedy & $O(n \log n)$ & $O(n)$ \\
+        Vecino más cercano  & Greedy & $O(n^2)$      & $O(n)$ \\
+        Merge Sort          & Divide y Vencerás & $O(n \log n)$ & $O(n)$ \\
+        Knapsack 0/1        & Prog. Dinámica    & $O(n \cdot W)$ & $O(n \cdot W)$ \\
+        Held-Karp (TSP)     & Prog. Dinámica    & $O(2^n \cdot n^2)$ & $O(2^n \cdot n)$ \\
+        Backtracking rutas  & Backtracking      & $O(n!)$ peor caso & $O(n)$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Donde $n$ es el número de pedidos (nodos de entrega) y $W$ es la capacidad máxima del repartidor discretizada en decagramos.
+
+\subsection{Benchmarking Empírico: Tiempo de Ejecución}
+
+La Tabla \ref{tab:benchmark} muestra los tiempos de ejecución promedio de los algoritmos de ruta, obtenidos ejecutando \texttt{benchmarks/benchmark.py} con 20 repeticiones por configuración sobre el grafo de 20 nodos de Cusco.
+
+\begin{table}[h]
+    \centering
+    \caption{Tiempos de ejecución promedio en ms — Greedy vs Held-Karp (datos reales).}
+    \label{tab:benchmark}
+    \begin{tabular}{cccc}
+        \toprule
+        $n$ & \textbf{Greedy (ms)} & \textbf{Held-Karp (ms)} & \textbf{Speedup Greedy} \\
+        \midrule
+        3  & 0.037 & 0.282  & $7.6\times$ \\
+        5  & 0.035 & 0.272  & $7.8\times$ \\
+        8  & 0.069 & 1.392  & $20.2\times$ \\
+        10 & 0.115 & 5.845  & $50.8\times$ \\
+        12 & 0.304 & 42.204 & $138.8\times$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+La Figura \ref{fig:tiempo_vs_n} visualiza estos datos en escala logarítmica junto con las curvas teóricas de referencia $O(n^2)$ y $O(2^n \cdot n^2)$, confirmando que el crecimiento empírico sigue el orden teórico esperado.
+
+\begin{figure}[h]
+    \centering
+    \caption[Tiempo de ejecución Greedy vs Held-Karp en escala logarítmica]
+    {Tiempo de ejecución medido experimentalmente (ms) en función del número de pedidos $n$, en escala logarítmica. Las líneas punteadas representan las curvas teóricas de referencia escaladas al primer punto medido.}
+    \label{fig:tiempo_vs_n}
+    \includegraphics[width=140mm]{figuras/fig1_tiempo_vs_n.png}
+\end{figure}
+
+Para la ordenación, el Merge Sort procesó 10, 20 y 30 pedidos en 0.016, 0.031 y 0.051 ms respectivamente, mientras que Quick Sort registró 0.016, 0.029 y 0.043 ms, ambos consistentes con el orden $O(n \log n)$.
+
+\subsection{Calidad de Solución: Distancia Total de Ruta}
+
+La Tabla \ref{tab:calidad} compara la distancia total de la ruta producida por Greedy y Held-Karp para los mismos conjuntos de pedidos. La Figura \ref{fig:calidad_ruta} presenta la comparación visual con el gap de suboptimalidad del Greedy.
+
+\begin{table}[h]
+    \centering
+    \caption{Distancia total de ruta (m) y gap de suboptimalidad del Greedy respecto a Held-Karp.}
+    \label{tab:calidad}
+    \begin{tabular}{ccccc}
+        \toprule
+        $n$ & \textbf{Held-Karp (m)} & \textbf{Greedy (m)} & \textbf{Gap (\%)} \\
+        \midrule
+        3  & 905.72  & 905.72  & 0.00  \\
+        5  & 2{,}181 & 2{,}200 & 0.87  \\
+        8  & 4{,}089 & 4{,}592 & 12.29 \\
+        10 & 5{,}026 & 5{,}644 & 12.30 \\
+        12 & 6{,}435 & 7{,}388 & 14.81 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{figure}[h]
+    \centering
+    \caption[Comparación de calidad de ruta: Greedy vs Held-Karp]
+    {Panel izquierdo: distancia total de ruta en km. Panel derecho: gap porcentual de suboptimalidad del Greedy respecto al óptimo de Held-Karp.}
+    \label{fig:calidad_ruta}
+    \includegraphics[width=145mm]{figuras/fig2_calidad_ruta.png}
+\end{figure}
+
+\subsection{Backtracking: Rutas Alternativas con Poda}
+
+La Tabla \ref{tab:backtracking} y la Figura \ref{fig:backtracking} resumen los resultados del algoritmo Backtracking aplicado a cuatro pares de nodos del grafo de Cusco.
+
+\begin{table}[h]
+    \centering
+    \caption{Resultados del Backtracking en cuatro escenarios del grafo de Cusco.}
+    \label{tab:backtracking}
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Par O-D} & \textbf{Rutas} & \textbf{Podas} & \textbf{Estados} & \textbf{Tiempo (ms)} \\
+        \midrule
+        N01$\to$N04 (Cercano)  & 4 & 24  & 64  & 0.167 \\
+        N02$\to$N11 (Medio)    & 3 & 16  & 39  & 0.058 \\
+        N01$\to$N15 (Largo)    & 4 & 39  & 120 & 0.178 \\
+        N05$\to$N19 (Extremo)  & 9 & 286 & 947 & 1.073 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{figure}[h]
+    \centering
+    \caption[Rendimiento del Backtracking con poda]
+    {Panel izquierdo: ramas podadas y estados visitados por escenario. Panel derecho: rutas alternativas encontradas y tiempo de cómputo en ms.}
+    \label{fig:backtracking}
+    \includegraphics[width=145mm]{figuras/fig3_backtracking.png}
+\end{figure}
+
+\subsection{Verificación de Correctitud: Pruebas Unitarias}
+
+Se ejecutaron las pruebas unitarias con \texttt{pytest} sobre los cuatro módulos algorítmicos del directorio \texttt{core/}, obteniendo 17 pruebas aprobadas y 0 fallos (véase Anexo C para el output completo).
+
+\section{Discusión}
+
+Los resultados confirman las predicciones teóricas del análisis Big-O con datos empíricos medibles. El hallazgo más significativo es el crecimiento exponencial del algoritmo Held-Karp: al pasar de $n=10$ a $n=12$ pedidos, su tiempo de ejecución se multiplicó aproximadamente 7.2 veces (de 5.85 ms a 42.20 ms), tendencia que hace inviable su uso para $n>15$ en tiempo interactivo. Esto ilustra de forma concreta por qué los problemas NP-difíciles, a pesar de tener soluciones exactas, requieren heurísticas en escenarios de producción.
+
+El gap de calidad del Greedy creció del 0\% para $n=3$ al 14.81\% para $n=12$, lo que indica que a mayor número de pedidos, la heurística se aleja más del óptimo. Sin embargo, con un speedup de $138.8\times$ en $n=12$, el Greedy resulta claramente preferible cuando el tiempo de respuesta es crítico (aplicaciones interactivas, operaciones en tiempo real).
+
+El Backtracking demostró alta eficiencia de poda: en el escenario extremo (N05$\to$N19), la relación podas/estados fue 286/947 $\approx 30\%$, reduciendo sustancialmente el espacio de búsqueda. Las 9 rutas alternativas encontradas en 1.07 ms confirman que el algoritmo es viable para su uso en grafos urbanos de tamaño moderado con calles bloqueadas.
+
+El ordenamiento Merge Sort presentó el comportamiento $O(n \log n)$ teórico con alta estabilidad: la proporción $t(30)/t(10) \approx 3.15$ es cercana al valor teórico $\frac{30 \log 30}{10 \log 10} \approx 4.4$ (la diferencia se debe a los costos constantes del intérprete Python). El algoritmo garantiza orden estable, propiedad relevante cuando los pedidos tienen la misma distancia al depósito y deben mantenerse en orden de prioridad de inserción.

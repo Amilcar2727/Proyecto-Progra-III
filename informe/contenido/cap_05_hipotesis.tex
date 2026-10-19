@@ -1,0 +1,23 @@
+\chapter{Hipótesis de Investigación}
+
+\section{Hipótesis General}
+
+La implementación de un sistema computacional que integra los paradigmas algorítmicos Greedy, Divide y Vencerás, Programación Dinámica y Backtracking permite gestionar rutas de reparto en la ciudad del Cusco de forma sistemática y eficiente, con la condición de que el número de pedidos activos no supere 12 para que el algoritmo exacto Held-Karp sea ejecutable en tiempo interactivo (menor a 50 ms en hardware de escritorio estándar).
+
+\section{Hipótesis Específicas}
+
+\begin{itemize}
+    \item El algoritmo de Programación Dinámica Held-Karp producirá, en todos los casos evaluados, una distancia de ruta menor o igual a la del Greedy, con un gap de suboptimalidad del Greedy que crecerá con $n$, superando el 10\% a partir de $n \geq 8$ pedidos activos.
+    \item El tiempo de ejecución medido empíricamente del algoritmo Held-Karp crecerá de forma exponencial con el número de pedidos $n$, mientras que el tiempo del algoritmo Greedy crecerá de forma polinomial, verificando los órdenes teóricos $O(2^n \cdot n^2)$ y $O(n^2)$, respectivamente.
+    \item El algoritmo de Backtracking encontrará todas las rutas alternativas simples entre el nodo origen y destino en el grafo vial, aplicando poda de ciclos eficientemente, con un tiempo de ejecución menor a 2 ms para los pares de nodos evaluados en el grafo de 20 nodos de Cusco.
+\end{itemize}
+
+\section{Verificación de Hipótesis}
+
+Tras la ejecución de los \textit{benchmarks} y la revisión de resultados (Capítulo 7), las hipótesis fueron verificadas de la siguiente manera:
+
+\begin{itemize}
+    \item \textbf{Hipótesis 1 — Confirmada:} Held-Karp produjo en todos los casos la ruta de menor distancia. El gap del Greedy fue 0\% para $n=3$, creció a 12.29\% para $n=8$ y llegó a 14.81\% para $n=12$, superando el umbral del 10\% a partir de $n=8$ exactamente como se predijo.
+    \item \textbf{Hipótesis 2 — Confirmada:} El speedup del Greedy sobre Held-Karp pasó de $7.6\times$ en $n=3$ a $138.8\times$ en $n=12$, crecimiento consistente con la divergencia exponencial esperada. Las curvas teóricas de referencia en la Figura \ref{fig:tiempo_vs_n} confirman el ajuste.
+    \item \textbf{Hipótesis 3 — Confirmada:} El Backtracking encontró entre 3 y 9 rutas alternativas en los 4 escenarios evaluados, con tiempos de 0.058 a 1.073 ms, todos menores a 2 ms como se predijo.
+\end{itemize}

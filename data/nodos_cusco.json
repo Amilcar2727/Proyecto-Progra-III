@@ -1,0 +1,175 @@
+{
+  "_comentario": "Grafo simulado de la red vial de Cusco con 20 nodos de referencia real. Las coordenadas geográficas son aproximadas.",
+  "nodos": [
+    {
+      "id": "N01",
+      "nombre": "Plaza de Armas",
+      "lat": -13.5167,
+      "lon": -71.9788,
+      "sector": "Centro Histórico"
+    },
+    {
+      "id": "N02",
+      "nombre": "San Blas",
+      "lat": -13.5152,
+      "lon": -71.9750,
+      "sector": "Centro Histórico"
+    },
+    {
+      "id": "N03",
+      "nombre": "Coricancha",
+      "lat": -13.5204,
+      "lon": -71.9753,
+      "sector": "Centro Histórico"
+    },
+    {
+      "id": "N04",
+      "nombre": "Mercado San Pedro",
+      "lat": -13.5194,
+      "lon": -71.9835,
+      "sector": "Centro Histórico"
+    },
+    {
+      "id": "N05",
+      "nombre": "Plaza Santiago",
+      "lat": -13.5230,
+      "lon": -71.9860,
+      "sector": "Santiago"
+    },
+    {
+      "id": "N06",
+      "nombre": "Santa Ana",
+      "lat": -13.5175,
+      "lon": -71.9880,
+      "sector": "Santiago"
+    },
+    {
+      "id": "N07",
+      "nombre": "Sacsayhuamán Acceso",
+      "lat": -13.5095,
+      "lon": -71.9818,
+      "sector": "Centro Histórico"
+    },
+    {
+      "id": "N08",
+      "nombre": "Limacpampa",
+      "lat": -13.5185,
+      "lon": -71.9730,
+      "sector": "Centro Histórico"
+    },
+    {
+      "id": "N09",
+      "nombre": "Lucrepata",
+      "lat": -13.5180,
+      "lon": -71.9690,
+      "sector": "Wanchaq"
+    },
+    {
+      "id": "N10",
+      "nombre": "Av. El Sol (Cruce Pardo)",
+      "lat": -13.5235,
+      "lon": -71.9720,
+      "sector": "Wanchaq"
+    },
+    {
+      "id": "N11",
+      "nombre": "Wanchaq (Estación)",
+      "lat": -13.5248,
+      "lon": -71.9685,
+      "sector": "Wanchaq"
+    },
+    {
+      "id": "N12",
+      "nombre": "Plaza Túpac Amaru",
+      "lat": -13.5225,
+      "lon": -71.9635,
+      "sector": "Wanchaq"
+    },
+    {
+      "id": "N13",
+      "nombre": "Ttio La Florida",
+      "lat": -13.5305,
+      "lon": -71.9595,
+      "sector": "Wanchaq"
+    },
+    {
+      "id": "N14",
+      "nombre": "Hospital Regional",
+      "lat": -13.5255,
+      "lon": -71.9560,
+      "sector": "Wanchaq"
+    },
+    {
+      "id": "N15",
+      "nombre": "Av. Cultura (UNSAAC)",
+      "lat": -13.5270,
+      "lon": -71.9515,
+      "sector": "Wanchaq"
+    },
+    {
+      "id": "N16",
+      "nombre": "Cuatro Torpes",
+      "lat": -13.5320,
+      "lon": -71.9480,
+      "sector": "San Sebastián"
+    },
+    {
+      "id": "N17",
+      "nombre": "Magisterio",
+      "lat": -13.5285,
+      "lon": -71.9420,
+      "sector": "San Sebastián"
+    },
+    {
+      "id": "N18",
+      "nombre": "Marcavalle",
+      "lat": -13.5298,
+      "lon": -71.9330,
+      "sector": "San Sebastián"
+    },
+    {
+      "id": "N19",
+      "nombre": "Plaza San Sebastián",
+      "lat": -13.5332,
+      "lon": -71.9260,
+      "sector": "San Sebastián"
+    },
+    {
+      "id": "N20",
+      "nombre": "San Jerónimo Entrada",
+      "lat": -13.5410,
+      "lon": -71.9050,
+      "sector": "San Sebastián"
+    }
+  ],
+  "aristas": [
+    ["N01", "N02"],
+    ["N01", "N03"],
+    ["N01", "N04"],
+    ["N01", "N07"],
+    ["N02", "N08"],
+    ["N02", "N07"],
+    ["N03", "N08"],
+    ["N03", "N10"],
+    ["N04", "N05"],
+    ["N04", "N06"],
+    ["N05", "N06"],
+    ["N05", "N10"],
+    ["N06", "N07"],
+    ["N08", "N09"],
+    ["N09", "N12"],
+    ["N10", "N11"],
+    ["N11", "N12"],
+    ["N11", "N13"],
+    ["N12", "N14"],
+    ["N13", "N14"],
+    ["N13", "N16"],
+    ["N14", "N15"],
+    ["N15", "N16"],
+    ["N15", "N17"],
+    ["N16", "N18"],
+    ["N17", "N18"],
+    ["N18", "N19"],
+    ["N19", "N20"]
+  ]
+}

@@ -1,0 +1,21 @@
+\chapter{Conclusiones y Recomendaciones}
+
+\section{Conclusiones}
+
+\begin{itemize}
+    \item \textbf{Sobre la implementación algorítmica:} Se implementaron exitosamente los cuatro paradigmas algorítmicos exigidos — Greedy (selección por densidad y vecino más cercano), Divide y Vencerás (Merge Sort), Programación Dinámica (Knapsack 0/1 y Held-Karp) y Backtracking (rutas con poda de ciclos) — desde cero en Python, sin librerías de optimización externas, con correctitud verificada mediante pruebas unitarias con \texttt{pytest}. La modularidad del código facilitó la comprensión individual de cada algoritmo y su integración en la interfaz gráfica.
+
+    \item \textbf{Sobre la complejidad computacional:} Los \textit{benchmarks} empíricos confirmaron las predicciones del análisis Big-O. Held-Karp exhibió crecimiento exponencial $O(2^n \cdot n^2)$, alcanzando 42.20 ms para $n=12$ con un speedup del Greedy de $138.8\times$ en ese punto. El Greedy mantuvo tiempos menores a 0.31 ms para todos los $n$ evaluados ($n \leq 12$), consistente con $O(n^2)$. El Merge Sort confirmó $O(n \log n)$ con tiempos de 0.016 a 0.051 ms para 10--30 pedidos.
+
+    \item \textbf{Sobre la calidad de solución:} Held-Karp garantizó la ruta óptima en todos los casos. El gap de suboptimalidad del Greedy creció de 0\% para $n=3$ a 14.81\% para $n=12$, lo que evidencia que la heurística Greedy es aceptable para instancias pequeñas ($n \leq 5$) pero se aleja progresivamente del óptimo a medida que el problema crece. El Backtracking encontró entre 3 y 9 rutas alternativas en menos de 1.1 ms en todos los escenarios evaluados, demostrando ser viable para grafos urbanos de tamaño moderado.
+
+    \item \textbf{Sobre el sistema desarrollado:} La aplicación de escritorio es estable, ejecutable sin conexión a internet mediante el canvas Tkinter nativo, y permite verificar visualmente todos los algoritmos a través de su interfaz gráfica con pestañas. La arquitectura modular permite extender el sistema con nuevos algoritmos o datos reales de OpenStreetMap sin refactorizar el código existente.
+\end{itemize}
+
+\section{Recomendaciones}
+
+\begin{itemize}
+    \item Para aplicabilidad real en Cusco, se recomienda reemplazar el grafo simulado de 20 nodos por el grafo vial extraído de OpenStreetMap mediante \texttt{osmnx}, e implementar el algoritmo de Dijkstra para calcular distancias reales entre pares de nodos en lugar de la distancia Haversine directa, mejorando la calidad de las rutas generadas al respetar la geometría de la red vial.
+    \item Para escalar el sistema a conjuntos de pedidos mayores ($n > 15$), se recomienda reemplazar el Held-Karp exacto por heurísticas de mejora como 2-opt o Lin-Kernighan, que producen soluciones de alta calidad en tiempo $O(n^2)$ e $O(n^3)$ respectivamente, sin la limitación exponencial.
+    \item Se sugiere añadir persistencia de pedidos con SQLite y una interfaz de registro en tiempo real, así como integrar una API de geocodificación para convertir direcciones de texto en coordenadas geográficas, haciendo el sistema operativo para empresas de reparto en Cusco.
+\end{itemize}

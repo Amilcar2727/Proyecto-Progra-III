@@ -1,0 +1,79 @@
+\chapter{Marco Teórico}
+
+En este capítulo se presentan los fundamentos teóricos que sustentan el diseño e implementación del sistema. Se abordan los conceptos de grafos, los paradigmas algorítmicos implementados, los problemas de optimización combinatoria subyacentes y la notación de complejidad computacional empleada para el análisis.
+
+\section{Antecedentes}
+
+\citet{dantzig1959truck} formularon el Problema de Enrutamiento de Vehículos (VRP) como generalización del TSP con múltiples vehículos y capacidad limitada, estableciendo las bases formales del problema que este proyecto aborda en escala reducida. Su trabajo demostró que la planificación óptima de rutas es NP-difícil en el caso general, lo que motiva el uso de heurísticas y algoritmos exactos de complejidad exponencial acotada.
+
+\citet{held1962dynamic} propusieron el algoritmo de Programación Dinámica para el TSP que lleva su nombre (Held-Karp), reduciendo la complejidad de la fuerza bruta $O(n!)$ a $O(2^n \cdot n^2)$ mediante la técnica de memoización sobre subconjuntos de nodos visitados. Este es el algoritmo exacto implementado en el presente proyecto para la optimización de rutas de reparto.
+
+\citet{rosenkrantz1977analysis} analizaron heurísticas constructivas para el TSP, incluyendo la heurística del vecino más cercano (\textit{nearest neighbor}), que constituye la base del enfoque Greedy implementado en este trabajo. Sus resultados establecen que esta heurística produce rutas de a lo sumo el doble de la longitud óptima en el peor caso.
+
+\citet{cormen2022introduction} proporcionan el tratamiento algorítmico formal de los paradigmas implementados: Divide y Vencerás (Merge Sort, capítulo 2), Programación Dinámica (Knapsack 0/1, capítulo 16) y Backtracking (capítulo 34), así como el análisis de complejidad Big-O utilizado en este informe.
+
+\citet{toth2014vehicle} presentan una revisión exhaustiva de métodos exactos y heurísticos para el VRP con restricciones de capacidad (CVRP), contextualizando el problema de selección y secuenciación de pedidos en el marco de la logística moderna.
+
+\section{Bases Teóricas}
+
+\subsection{Grafos y Representación de la Red Vial}
+
+Un grafo $G = (V, E)$ consiste en un conjunto de vértices $V$ (nodos) y un conjunto de aristas $E \subseteq V \times V$. En este proyecto, cada nodo $v_i \in V$ representa una ubicación georreferenciada en Cusco, caracterizada por una latitud $\phi_i$ y longitud $\lambda_i$. Cada arista $e_{ij} = (v_i, v_j, w_{ij}) \in E$ representa una conexión vial entre dos nodos con peso $w_{ij}$ igual a la distancia ortodrómica calculada mediante la fórmula de Haversine:
+
+\begin{equation}
+    d(i,j) = 2R \cdot \arcsin\!\left(\sqrt{\sin^2\!\left(\tfrac{\phi_j - \phi_i}{2}\right) + \cos\phi_i\cos\phi_j\sin^2\!\left(\tfrac{\lambda_j - \lambda_i}{2}\right)}\right)
+    \label{eq:haversine}
+\end{equation}
+
+donde $R = 6{,}371{,}000$ m es el radio medio de la Tierra \citep{cormen2022introduction}. El grafo se almacena como diccionario de listas de adyacencia, estructura que permite recorrer los vecinos de un nodo en $O(\deg(v))$ y ocupa $O(|V| + |E|)$ de espacio.
+
+\subsection{Paradigma Greedy}
+
+Un algoritmo \textit{Greedy} construye una solución paso a paso, tomando en cada etapa la decisión localmente óptima sin reconsiderar elecciones anteriores \citep{cormen2022introduction}. En este proyecto se aplica para la selección de pedidos: se calcula para cada pedido $p_i$ su densidad $\delta_i = \text{prioridad}_i / (\text{peso}_i \cdot d_i)$, donde $d_i$ es la distancia desde el depósito hasta el nodo del pedido. Los pedidos se ordenan de mayor a menor $\delta_i$ y se seleccionan en ese orden mientras la capacidad restante del repartidor lo permita. Este proceso tiene complejidad $O(n \log n)$ por el ordenamiento y $O(n)$ para la selección, resultando en $O(n \log n)$ total.
+
+\subsection{Paradigma Divide y Vencerás}
+
+El paradigma \textit{Divide y Vencerás} divide el problema en subproblemas del mismo tipo, los resuelve recursivamente y combina sus soluciones \citep{cormen2022introduction}. En este proyecto se implementa mediante el algoritmo \textbf{Merge Sort} para ordenar la lista de pedidos por distancia al depósito:
+
+\begin{algorithm}[H]
+\SetAlgoLined
+\KwData{Lista $A$ de $n$ pedidos con distancias}
+\KwResult{Lista $A$ ordenada de menor a mayor distancia}
+\If{$|A| \leq 1$}{\Return $A$}
+$\text{mitad} \leftarrow \lfloor |A|/2 \rfloor$\;
+$L \leftarrow \texttt{merge\_sort}(A[:\text{mitad}])$\;
+$R \leftarrow \texttt{merge\_sort}(A[\text{mitad}:])$\;
+\Return $\texttt{merge}(L, R)$\;
+\caption{Merge Sort para pedidos (Divide y Vencerás)}
+\label{alg:mergesort}
+\end{algorithm}
+
+La relación de recurrencia del Merge Sort es $T(n) = 2T(n/2) + O(n)$, cuya solución por el Teorema Maestro es $T(n) = O(n \log n)$, con espacio auxiliar $O(n)$.
+
+\subsection{Programación Dinámica}
+
+La \textit{Programación Dinámica} (PD) resuelve un problema descomponiéndolo en subproblemas superpuestos cuya solución se almacena (\textit{memoización} o tabulación) para evitar recálculos \citep{bellman1957dynamic}.
+
+\textbf{Knapsack 0/1.} Dado un conjunto de pedidos $\{p_1, \ldots, p_n\}$, cada uno con peso $w_i$ y valor $v_i$, y una capacidad máxima $W$, se busca el subconjunto de pedidos que maximice $\sum v_i$ sujeto a $\sum w_i \leq W$. La tabla de PD $dp[i][c]$ representa el valor máximo considerando los primeros $i$ pedidos con capacidad $c$:
+
+\begin{equation}
+    dp[i][c] = \max\bigl(dp[i-1][c],\; v_i + dp[i-1][c - w_i]\bigr) \quad \text{si } w_i \leq c
+\end{equation}
+
+Complejidad: $O(n \cdot W)$ tiempo y $O(n \cdot W)$ espacio (optimizable a $O(W)$ usando una sola fila).
+
+\textbf{Held-Karp (TSP exacto).} Dado un conjunto de nodos de entrega $S = \{s_1, \ldots, s_n\}$ y las distancias $d(i,j)$ entre ellos, el algoritmo Held-Karp calcula la ruta hamiltoniana de mínimo costo que parte del depósito, visita todos los nodos de $S$ exactamente una vez y regresa al depósito \citep{held1962dynamic}. Define:
+
+\begin{equation}
+    C(S, i) = \min_{j \in S \setminus \{i\}} \bigl[ C(S \setminus \{i\}, j) + d(j, i) \bigr]
+\end{equation}
+
+donde $C(\{i\}, i) = d(\text{depósito}, i)$. El estado $(S, i)$ codifica que se han visitado exactamente los nodos de $S$ y el último visitado fue $i$. Con $n$ nodos de entrega hay $2^n$ subconjuntos y $n$ posibles últimos nodos, dando $O(2^n \cdot n)$ estados y $O(n)$ transiciones por estado: complejidad total $O(2^n \cdot n^2)$ tiempo y $O(2^n \cdot n)$ espacio.
+
+\subsection{Backtracking}
+
+El \textit{Backtracking} es una técnica de búsqueda exhaustiva con poda: construye la solución incrementalmente y abandona una rama de la búsqueda (\textit{retrocede}) tan pronto como detecta que no puede conducir a una solución válida \citep{cormen2022introduction}. En este proyecto se usa para encontrar rutas en el grafo vial que eviten aristas bloqueadas: dado un nodo origen y un nodo destino, el algoritmo explora en profundidad (DFS) todos los caminos posibles, marcando nodos visitados para evitar ciclos y podando si se supera una longitud máxima configurable. En el peor caso, sin bloqueos, el algoritmo recorre todos los caminos simples en el grafo, cuya cantidad es $O(n!)$; en la práctica, la poda y los bloqueos reducen dramáticamente el espacio de búsqueda.
+
+\subsection{Notación Big-O}
+
+La notación $O(f(n))$ describe el crecimiento asintótico del tiempo o espacio de un algoritmo en el peor caso \citep{cormen2022introduction}. Se dice que $T(n) = O(f(n))$ si existen constantes $c > 0$ y $n_0 \geq 0$ tales que $T(n) \leq c \cdot f(n)$ para todo $n \geq n_0$. Las complejidades relevantes para este proyecto, ordenadas de mejor a peor, son: $O(1)$, $O(\log n)$, $O(n)$, $O(n \log n)$, $O(n^2)$, $O(n \cdot W)$ (pseudopolinomial), $O(2^n \cdot n^2)$, $O(n!)$.
