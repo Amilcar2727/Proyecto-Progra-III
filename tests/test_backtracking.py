@@ -73,3 +73,29 @@ def test_backtracking_poda_por_costo():
     # En un recorrido largo en la red de Cusco, debe haber podas efectivas por cota
     assert res.total_ramas_podadas > 0
     assert res.ruta_optima is not None
+
+
+def test_sin_poda_enumera_todas_las_rutas_san_blas_wanchaq():
+    """Caso del enunciado: todas las rutas de San Blas (N02) a Wanchaq (N11)."""
+    from core.gestor_datos import cargar_grafo
+    g = cargar_grafo()
+    sin_poda = buscar_rutas_backtracking(g, "N02", "N11", usar_poda=False)
+    con_poda = buscar_rutas_backtracking(g, "N02", "N11", usar_poda=True)
+    assert len(sin_poda.rutas_encontradas) == 27
+    assert sin_poda.total_ramas_podadas == 0
+    # La poda no pierde el óptimo y visita menos estados
+    assert con_poda.ruta_optima == sin_poda.ruta_optima
+    assert con_poda.total_estados_visitados < sin_poda.total_estados_visitados
+    # Todas las rutas son caminos simples y están ordenadas por distancia
+    distancias = [d for _, d in sin_poda.rutas_encontradas]
+    assert distancias == sorted(distancias)
+    for camino, _ in sin_poda.rutas_encontradas:
+        assert len(camino) == len(set(camino))
+
+
+def test_sin_poda_respeta_calles_cerradas(grafo_diamante):
+    grafo_diamante.cambiar_estado_calle("N03", "N04", activa=False)
+    res = buscar_rutas_backtracking(grafo_diamante, "N01", "N04", usar_poda=False)
+    for camino, _ in res.rutas_encontradas:
+        assert ("N03", "N04") not in zip(camino, camino[1:])
+    assert res.ruta_optima[0] == ["N01", "N02", "N04"]

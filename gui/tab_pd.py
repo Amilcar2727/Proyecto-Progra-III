@@ -5,25 +5,37 @@ y Held-Karp (TSP Óptimo con Bitmask y Memoización) comparado contra Greedy
 ejecutado en un hilo de fondo (threading) para no congelar la GUI.
 """
 
-import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
-from typing import List, Tuple
+from typing import List, Optional
 import config
-from core.modelos import Grafo, Pedido
+from core.modelos import Grafo, Pedido, Repartidor
 from core.prog_dinamica import resolver_mochila_01, held_karp_tsp
-from core.greedy import vecino_mas_cercano
+from core.greedy import vecino_mas_cercano, mochila_voraz_por_densidad
 from core.grafo import matriz_para_nodos
 from gui.componente_mapa import ComponenteMapa
+from gui.panel_desplazable import crear_panel_lateral
+from gui.hilos import ejecutar_en_segundo_plano
+
+ESCALA_MOCHILA = 10  # 10 unidades por kg -> precisión de 0.1 kg
 
 
 class TabPD(ttk.Frame):
     """Pestaña que contiene Mochila 0/1 y Held-Karp."""
 
-    def __init__(self, master, grafo: Grafo, pedidos: List[Pedido], *args, **kwargs):
+    def __init__(
+        self,
+        master,
+        grafo: Grafo,
+        pedidos: List[Pedido],
+        repartidores: Optional[List[Repartidor]] = None,
+        *args,
+        **kwargs,
+    ):
         super().__init__(master, *args, **kwargs)
         self.grafo = grafo
         self.pedidos = pedidos
+        self.repartidores = repartidores or []
 
         self._crear_interfaz()
 
@@ -41,8 +53,7 @@ class TabPD(ttk.Frame):
         self._configurar_subtab_held_karp()
 
     def _configurar_subtab_mochila(self):
-        panel_izq = ttk.Frame(self.tab_mochila, width=340, padding=10)
-        panel_izq.pack(side=tk.LEFT, fill=tk.Y)
+        panel_izq = crear_panel_lateral(self.tab_mochila, ancho=340, padding=10)
 
         ttk.Label(
             panel_izq,
@@ -62,14 +73,25 @@ class TabPD(ttk.Frame):
         frame_cap = ttk.LabelFrame(panel_izq, text="Capacidad del Repartidor", padding=10)
         frame_cap.pack(fill=tk.X, pady=4)
 
-        ttk.Label(frame_cap, text="Capacidad de Carga Máxima (kg):").pack(anchor="w")
-        self.spin_peso_max = ttk.Spinbox(frame_cap, from_=5, to=50, width=10)
+        ttk.Label(frame_cap, text="Vehículo (fija la capacidad):").pack(anchor="w")
+        self.cb_repartidor = ttk.Combobox(
+            frame_cap,
+            values=[f"{r.id}: {r.nombre} ({r.cap_peso_kg:g} kg)" for r in self.repartidores]
+            + ["Capacidad personalizada"],
+            state="readonly",
+        )
+        self.cb_repartidor.current(len(self.repartidores))
+        self.cb_repartidor.bind("<<ComboboxSelected>>", self._al_elegir_repartidor)
+        self.cb_repartidor.pack(fill=tk.X, pady=3)
+
+        ttk.Label(frame_cap, text="Capacidad de Carga Máxima (kg, admite 0.1):").pack(anchor="w")
+        self.spin_peso_max = ttk.Spinbox(frame_cap, from_=1, to=120, increment=0.5, width=10)
         self.spin_peso_max.set("25")
         self.spin_peso_max.pack(anchor="w", pady=3)
 
-        ttk.Label(frame_cap, text="Subconjunto de Pedidos a Evaluar (N):").pack(anchor="w", pady=(4, 0))
-        self.spin_n_mochila = ttk.Spinbox(frame_cap, from_=5, to=len(self.pedidos), width=10)
-        self.spin_n_mochila.set("15")
+        ttk.Label(frame_cap, text="Pedidos a evaluar (los N primeros):").pack(anchor="w", pady=(4, 0))
+        self.spin_n_mochila = ttk.Spinbox(frame_cap, from_=1, to=len(self.pedidos), width=10)
+        self.spin_n_mochila.set(str(min(15, len(self.pedidos))))
         self.spin_n_mochila.pack(anchor="w", pady=3)
 
         self.btn_resolver_mochila = ttk.Button(
@@ -91,7 +113,10 @@ class TabPD(ttk.Frame):
 
         self.lbl_info_matriz = ttk.Label(
             panel_der,
-            text="Filas: Ítems considerados (i) | Columnas: Capacidad parcial en kg (w)",
+            text=(
+                "Filas: pedidos considerados (i) | Columnas: capacidad parcial w. "
+                f"La tabla se calcula cada 0.1 kg; aquí se muestra una columna por kg."
+            ),
             font=("Segoe UI", 8, "italic"),
             foreground="#64748b",
         )
@@ -110,8 +135,7 @@ class TabPD(ttk.Frame):
         scroll_x.pack(side=tk.BOTTOM, fill=tk.X)
 
     def _configurar_subtab_held_karp(self):
-        panel_izq = ttk.Frame(self.tab_held_karp, width=340, padding=10)
-        panel_izq.pack(side=tk.LEFT, fill=tk.Y)
+        panel_izq = crear_panel_lateral(self.tab_held_karp, ancho=340, padding=10)
 
         ttk.Label(
             panel_izq,
@@ -132,7 +156,7 @@ class TabPD(ttk.Frame):
         frame_hk.pack(fill=tk.X, pady=4)
 
         ttk.Label(frame_hk, text="Cantidad de Puntos N (Límite Seguro ≤ 12):").pack(anchor="w")
-        self.spin_n_hk = ttk.Spinbox(frame_hk, from_=3, to=14, width=10)
+        self.spin_n_hk = ttk.Spinbox(frame_hk, from_=3, to=min(14, len(self.pedidos)), width=10)
         self.spin_n_hk.set("8")
         self.spin_n_hk.pack(anchor="w", pady=3)
 
@@ -157,50 +181,90 @@ class TabPD(ttk.Frame):
         self.mapa_hk.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         self.mapa_hk.dibujar_grafo()
 
+    def refrescar(self):
+        """Actualiza los límites si se registraron pedidos nuevos."""
+        self.spin_n_mochila.config(to=len(self.pedidos))
+        self.spin_n_hk.config(to=min(14, len(self.pedidos)))
+        if self.mapa_hk.esta_desactualizado():
+            self.mapa_hk.dibujar_grafo()
+
+    def _repartidor_elegido(self) -> Optional[Repartidor]:
+        idx = self.cb_repartidor.current()
+        return self.repartidores[idx] if 0 <= idx < len(self.repartidores) else None
+
+    def _al_elegir_repartidor(self, _evento=None):
+        rep = self._repartidor_elegido()
+        if rep is not None:
+            self.spin_peso_max.set(f"{rep.cap_peso_kg:g}")
+
     def _ejecutar_mochila(self):
         try:
-            w_max = int(self.spin_peso_max.get())
+            w_max = float(self.spin_peso_max.get().replace(",", "."))
             n_items = int(self.spin_n_mochila.get())
         except ValueError:
-            messagebox.showerror("Error", "Parámetros numéricos inválidos.")
+            messagebox.showerror("Error", "La capacidad y N deben ser números.")
+            return
+        if w_max <= 0 or n_items <= 0:
+            messagebox.showerror("Error", "La capacidad y N deben ser mayores que cero.")
             return
 
         candidatos = self.pedidos[:n_items]
-        valor_opt, seleccionados, dp = resolver_mochila_01(candidatos, w_max)
+        valor_opt, seleccionados, dp = resolver_mochila_01(candidatos, w_max, escala=ESCALA_MOCHILA)
+        valor_voraz, elegidos_voraz = mochila_voraz_por_densidad(candidatos, w_max)
 
         peso_total = sum(p.peso_kg for p in seleccionados)
         vol_total = sum(p.volumen_l for p in seleccionados)
+        rep = self._repartidor_elegido()
 
-        # Mostrar resumen
-        self.txt_res_mochila.delete("1.0", tk.END)
-        self.txt_res_mochila.insert(tk.END, "=== MOCHILA 0/1 (PD) ===\n")
-        self.txt_res_mochila.insert(tk.END, f"Valor Máximo: S/. {valor_opt:,.2f}\n")
-        self.txt_res_mochila.insert(tk.END, f"Capacidad límite: {w_max} kg\n")
-        self.txt_res_mochila.insert(tk.END, f"Peso acumulado: {peso_total:.1f} kg\n")
-        self.txt_res_mochila.insert(tk.END, f"Volumen total: {vol_total:.1f} L\n")
-        self.txt_res_mochila.insert(tk.END, f"Pedidos elegidos: {len(seleccionados)}/{len(candidatos)}\n\n")
+        t = self.txt_res_mochila
+        t.delete("1.0", tk.END)
+        t.insert(tk.END, "=== MOCHILA 0/1 (PD) ===\n")
+        t.insert(tk.END, f"Valor máximo: S/. {valor_opt:,.2f}\n")
+        t.insert(tk.END, f"Peso cargado: {peso_total:.1f} / {w_max:g} kg\n")
+        t.insert(tk.END, f"Volumen: {vol_total:.1f} L")
+        if rep is not None:
+            estado = "OK" if vol_total <= rep.cap_vol_l else "EXCEDE"
+            t.insert(tk.END, f" / {rep.cap_vol_l:g} L ({estado})")
+        t.insert(tk.END, "\n")
+        t.insert(tk.END, f"Pedidos elegidos: {len(seleccionados)}/{len(candidatos)}\n")
+        t.insert(tk.END, f"Tabla: {len(dp)} x {len(dp[0])} celdas  O(N·W)\n\n")
         for p in seleccionados:
-            self.txt_res_mochila.insert(tk.END, f"• {p.id}: {p.peso_kg:.1f}kg -> S/. {p.valor_soles:.1f}\n")
+            t.insert(tk.END, f"• {p.id}: {p.peso_kg:.1f} kg -> S/. {p.valor_soles:.1f}\n")
 
-        # Cargar matriz DP en Treeview
+        t.insert(tk.END, "\n--- Comparación con Greedy (valor/kg) ---\n")
+        t.insert(tk.END, f"Valor voraz: S/. {valor_voraz:,.2f} ({len(elegidos_voraz)} pedidos)\n")
+        diferencia = valor_opt - valor_voraz
+        if diferencia > 1e-9:
+            t.insert(tk.END, f"La PD obtiene S/. {diferencia:,.2f} más que el voraz.\n")
+        else:
+            t.insert(tk.END, "En este caso el voraz también llegó al óptimo.\n")
+        if rep is not None and vol_total > rep.cap_vol_l:
+            t.insert(tk.END, "\nNota: la PD optimiza solo el peso; el volumen se verifica aparte.\n")
+
+        # Matriz DP: una columna por kg (cada ESCALA_MOCHILA columnas reales)
         for item in self.tabla_dp.get_children():
             self.tabla_dp.delete(item)
-
-        cols = ["Item / w"] + [f"{w}kg" for w in range(w_max + 1)]
+        indices = list(range(0, len(dp[0]), ESCALA_MOCHILA))
+        if indices[-1] != len(dp[0]) - 1:
+            indices.append(len(dp[0]) - 1)
+        cols = ["Item / w"] + [f"{c / ESCALA_MOCHILA:g}kg" for c in indices]
         self.tabla_dp["columns"] = cols
         for c in cols:
             self.tabla_dp.heading(c, text=c)
-            self.tabla_dp.column(c, width=55, anchor="center")
+            self.tabla_dp.column(c, width=58 if c != "Item / w" else 165, anchor="center", stretch=False)
 
-        # Fila 0 (Caso base)
-        self.tabla_dp.insert("", tk.END, values=["i=0 (Base)"] + [f"{v:.0f}" for v in dp[0]])
-
-        # Filas 1..N
+        elegidos_ids = {p.id for p in seleccionados}
+        self.tabla_dp.tag_configure("elegido", background="#ede9fe")
+        self.tabla_dp.insert("", tk.END, values=["i=0 (base)"] + [f"{dp[0][c]:.0f}" for c in indices])
         for i in range(1, len(dp)):
             p = candidatos[i - 1]
-            etiqueta = f"i={i} ({p.id})"
-            fila_vals = [etiqueta] + [f"{v:.0f}" for v in dp[i]]
-            self.tabla_dp.insert("", tk.END, values=fila_vals)
+            marca = " ✓" if p.id in elegidos_ids else ""
+            etiqueta = f"i={i} {p.id} ({p.peso_kg:g}kg){marca}"
+            self.tabla_dp.insert(
+                "", tk.END,
+                values=[etiqueta] + [f"{dp[i][c]:.0f}" for c in indices],
+                tags=("elegido",) if marca else (),
+            )
 
     def _lanzar_hilo_held_karp(self):
         try:
@@ -224,41 +288,31 @@ class TabPD(ttk.Frame):
         self.txt_res_hk.delete("1.0", tk.END)
         self.txt_res_hk.insert(tk.END, "Calculando Held-Karp y Greedy en segundo plano...\n")
 
-        hilo = threading.Thread(target=self._hilo_held_karp, args=(n,), daemon=True)
-        hilo.start()
-
-    def _hilo_held_karp(self, n: int):
-        try:
-            sub_pedidos = self.pedidos[:n]
-            matriz = matriz_para_nodos(self.grafo, [p.nodo_id for p in sub_pedidos])
-
-            # 1. Ejecutar Held-Karp
-            idx_hk, dist_hk, t_hk = held_karp_tsp(matriz, retornar_al_inicio=True)
-
-            # 2. Ejecutar Greedy en los mismos puntos
-            origen_id = sub_pedidos[0].nodo_id
-            ruta_greedy = vecino_mas_cercano(
-                nodo_inicio_id=origen_id,
-                pedidos=sub_pedidos[1:],
-                grafo=self.grafo,
-                retornar_al_inicio=True,
-            )
-
-            secuencia_nodos_hk = [sub_pedidos[i].nodo_id for i in idx_hk]
-        except (IndexError, KeyError, ValueError) as error:
-            self.after(0, self._finalizar_held_karp_error, str(error))
-            return
-
-        # Actualizar GUI en el hilo principal
-        self.after(
-            0,
-            self._finalizar_held_karp,
-            n,
-            secuencia_nodos_hk,
-            dist_hk,
-            t_hk,
-            ruta_greedy,
+        ejecutar_en_segundo_plano(
+            self,
+            lambda: self._calcular_held_karp(n),
+            lambda datos: self._finalizar_held_karp(*datos),
+            lambda error: self._finalizar_held_karp_error(str(error)),
         )
+
+    def _calcular_held_karp(self, n: int):
+        """Se ejecuta en el hilo de trabajo: no toca ningún widget."""
+        sub_pedidos = self.pedidos[:n]
+        matriz = matriz_para_nodos(self.grafo, [p.nodo_id for p in sub_pedidos])
+
+        # 1. Held-Karp (óptimo exacto)
+        idx_hk, dist_hk, t_hk = held_karp_tsp(matriz, retornar_al_inicio=True)
+
+        # 2. Greedy sobre los mismos puntos y desde el mismo inicio
+        origen_id = sub_pedidos[0].nodo_id
+        ruta_greedy = vecino_mas_cercano(
+            nodo_inicio_id=origen_id,
+            pedidos=sub_pedidos[1:],
+            grafo=self.grafo,
+            retornar_al_inicio=True,
+        )
+        secuencia_nodos_hk = [sub_pedidos[i].nodo_id for i in idx_hk]
+        return n, secuencia_nodos_hk, dist_hk, t_hk, ruta_greedy
 
     def _finalizar_held_karp_error(self, mensaje: str):
         self.progreso_hk.stop()

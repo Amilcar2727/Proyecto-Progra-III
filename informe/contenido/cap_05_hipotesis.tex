@@ -14,10 +14,13 @@ La implementación de un sistema computacional que integra los paradigmas algor�
 
 \section{Verificación de Hipótesis}
 
-Tras la ejecución de los \textit{benchmarks} y la revisión de resultados (Capítulo 7), las hipótesis fueron verificadas de la siguiente manera:
+Tras la ejecución de los \textit{benchmarks} sobre la red vial de OpenStreetMap (Capítulo 7), las hipótesis se verificaron de la siguiente manera:
 
 \begin{itemize}
-    \item \textbf{Hipótesis 1 — Confirmada:} Held-Karp produjo en todos los casos la ruta de menor distancia. El gap del Greedy fue 0\% para $n=3$, creció a 12.29\% para $n=8$ y llegó a 14.81\% para $n=12$, superando el umbral del 10\% a partir de $n=8$ exactamente como se predijo.
-    \item \textbf{Hipótesis 2 — Confirmada:} El speedup del Greedy sobre Held-Karp pasó de $7.6\times$ en $n=3$ a $138.8\times$ en $n=12$, crecimiento consistente con la divergencia exponencial esperada. Las curvas teóricas de referencia en la Figura \ref{fig:tiempo_vs_n} confirman el ajuste.
-    \item \textbf{Hipótesis 3 — Confirmada:} El Backtracking encontró entre 3 y 9 rutas alternativas en los 4 escenarios evaluados, con tiempos de 0.058 a 1.073 ms, todos menores a 2 ms como se predijo.
+    \item \textbf{Hipótesis general --- Confirmada:} Held-Karp resolvió $n=12$ puntos en 22.2 ms, por debajo del umbral de 50 ms, y la interfaz lo ejecuta en un hilo de fondo, por lo que la ventana no se bloquea aun con $n=14$.
+    \item \textbf{Hipótesis 1 --- Confirmada en lo esencial:} Held-Karp produjo en todos los casos una distancia menor o igual a la del Greedy, y el gap superó el 10\% desde $n=8$ (24.53\%, 21.23\% y 15.84\% para $n=8$, 10 y 12). Sin embargo, el gap no creció de forma monótona con $n$: alcanzó su máximo en $n=8$. El gap depende de la disposición concreta de los puntos y no solo de su cantidad.
+    \item \textbf{Hipótesis 2 --- Confirmada:} el tiempo de Held-Karp pasó de 0.059 ms ($n=5$) a 0.929 ms ($n=8$), 7.689 ms ($n=10$) y 22.166 ms ($n=12$), es decir, se multiplicó por 376 al pasar de 5 a 12 puntos, mientras que el Greedy se mantuvo por debajo de 0.05 ms en todos los casos.
+    \item \textbf{Hipótesis 3 --- Parcialmente confirmada:} en modo exhaustivo (sin poda) el Backtracking enumeró todas las rutas simples en tres de los cuatro pares (1, 27 y 152 rutas) en menos de 1 ms. En el par extremo N05$\to$N19 alcanzó el tope de seguridad de 500 rutas en 4.1 ms, por encima de los 2 ms previstos. Con la poda activada, los cuatro pares terminaron en menos de 1 ms y con la misma ruta óptima que el modo exhaustivo.
 \end{itemize}
+
+Los tiempos se midieron en el entorno descrito en el Capítulo 6. En otro equipo los valores absolutos cambian, pero no el orden de crecimiento ni las conclusiones; pueden regenerarse con \texttt{python benchmarks/benchmark.py}.

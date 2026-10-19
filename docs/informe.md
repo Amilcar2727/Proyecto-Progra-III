@@ -8,6 +8,8 @@
 **Proyecto:** Primer Examen Parcial / Proyecto Práctico  
 **Fecha:** Octubre de 2026  
 
+> Resumen en Markdown. La versión oficial y actualizada del informe es `informe/main.pdf`.
+
 ---
 
 ## 1. Introducción y Descripción del Sistema
@@ -108,30 +110,30 @@ Haversine **no es un peso de los algoritmos**: se conserva para asignar pedidos 
 
 #### B. Asignación de Despacho de Emergencia
 - **Idea:** Evalúa la distancia entre el pedido crítico (prioridad 1) y cada repartidor disponible, verificando si cuenta con capacidad de peso y volumen.
-- **Complejidad:** $O(R)$ en tiempo donde $R$ es el número de repartidores ($R \le 3 \implies O(1)$ efectivo). Espacio: $O(1)$.
+- **Complejidad:** $O(R)$ en tiempo, donde $R$ es el número de repartidores (una comparación por repartidor). Espacio: $O(1)$.
 
 ---
 
 ### 2.3. Paradigma Divide y Vencerás (Segmentación Espacial)
 
-- **Idea:** Descompone recursivamente el conjunto de pedidos en cuadrantes geográficos balanceados alternando el eje de corte (latitud en profundidades pares, longitud en impares) hasta que cada clúster contenga $\le K$ pedidos. Resuelve cada clúster localmente y ensambla el recorrido global conectando los centroides más próximos.
-- **Ecuación de Recurrencia:**
-  $$T(n) = 2 T\left(\frac{n}{2}\right) + O(n)$$
-  Donde $O(n)$ representa el costo de particionar el arreglo por la mediana en cada nivel.
-- **Resolución formal por el Teorema Maestro:**
-  - Forma general: $T(n) = a T(n/b) + f(n)$
-  - Constantes: $a = 2$, $b = 2$, $f(n) = \Theta(n)$
-  - Exponente crítico: $n^{\log_b a} = n^{\log_2 2} = n^1 = n$
-  - Comparación: Como $f(n) = \Theta(n^{\log_b a}) = \Theta(n)$, aplica el **Caso 2 del Teorema Maestro**.
-  - **Conclusión:** $T(n) = \Theta(n \log n)$.
-  - **Espacio Auxiliar:** $O(n)$ para almacenar los subarreglos y $O(\log n)$ en la pila de llamadas.
+- **Idea:** Descompone recursivamente el conjunto de pedidos cortando por la mediana y alternando el eje (latitud en profundidades pares, longitud en impares). Dos modos: (1) **una zona por repartidor** (`particionar_en_r_zonas`), que crea exactamente $R$ zonas cortando en proporción $\lfloor r/2\rfloor:\lceil r/2\rceil$; cada zona se asigna al repartidor más cercano y este la resuelve con Held-Karp; (2) **zonas de $\le K$ pedidos** para un solo repartidor, que entra a la zona con el pedido más cercano y la recorre con vecino más cercano.
+- **Ecuación de Recurrencia (zonas de K):**
+  $$T(n) = 2 T\left(\frac{n}{2}\right) + \Theta(n \log n)$$
+  El trabajo no recursivo es **ordenar** con Quick Sort para hallar la mediana, por eso $f(n) = \Theta(n \log n)$ y no $\Theta(n)$.
+- **Resolución por el Teorema Maestro (caso 2 extendido):**
+  - $a = 2$, $b = 2$, $n^{\log_b a} = n$.
+  - $f(n) = \Theta(n^{\log_b a} \log^1 n)$, con $k = 1$ $\Rightarrow$ $T(n) = \Theta(n \log^{2} n)$.
+  - Con Quickselect (mediana en $O(n)$) sería el caso 2 clásico: $\Theta(n \log n)$.
+- **Una zona por repartidor:** profundidad $\lceil \log_2 R \rceil$, $n$ elementos ordenados por nivel: $\Theta(n \log n \log R)$.
+- **Ruta con un repartidor:** elegir la siguiente zona entre $M = n/K$ cuesta $O(M^2 K) = O(n^2/K)$; es el término dominante.
+- **Espacio Auxiliar:** $O(n)$ para los subarreglos y $O(\log n)$ en la pila de llamadas.
 
 ---
 
 ### 2.4. Paradigma de Programación Dinámica (PD)
 
 #### A. Problema de la Mochila 0/1 (Knapsack)
-- **Idea:** Determina el conjunto óptimo de pedidos a cargar en el vehículo de reparto maximizando el valor económico total sin sobrepasar la capacidad $W$ en kilogramos.
+- **Idea:** Determina el conjunto óptimo de pedidos a cargar en el vehículo de reparto maximizando el valor económico total sin sobrepasar la capacidad $W$ en kilogramos. Los pesos se discretizan en décimas de kg redondeando hacia arriba (y la capacidad hacia abajo), de modo que la carga elegida nunca excede la capacidad real.
 - **Ecuación de Bellman:**
   $$DP[i][w] = \begin{cases} DP[i-1][w] & \text{si } w_i > w \\ \max\left(DP[i-1][w], DP[i-1][w - w_i] + v_i\right) & \text{si } w_i \le w \end{cases}$$
 - **Reconstrucción:** Se realiza un recorrido hacia atrás desde $DP[N][W]$: si $DP[i][w] \ne DP[i-1][w]$, el pedido $i$ forma parte de la solución óptima y se decrementa la capacidad restante $w \leftarrow w - w_i$.

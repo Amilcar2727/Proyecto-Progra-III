@@ -32,6 +32,10 @@ def vecino_mas_cercano(
       - Justificación: En la iteración 1 se evalúan n candidatos; en la 2, (n-1)...
         Suma: n + (n-1) + ... + 1 = n(n+1)/2 = O(n²).
     
+      - Supone la matriz de distancias de red ya calculada (consulta O(1)). Esa matriz
+        se obtiene una sola vez con V ejecuciones de Dijkstra: O(V·(V+E) log V), y se
+        reutiliza en todas las llamadas mientras no cambie el estado de las calles.
+
     Complejidad Espacial:
       - O(n) para mantener el conjunto de pedidos visitados y la secuencia de la ruta.
 
@@ -118,7 +122,9 @@ def asignar_pedido_emergencia(
           el nodo del pedido y elige el mínimo entre quienes tienen capacidad disponible.
 
     Complejidad Temporal:
-      - O(R) donde R es la cantidad de repartidores. Como R <= 3 en este sistema, es O(1) efectivo.
+      - O(R) donde R es la cantidad de repartidores: una comparación por repartidor.
+        (Con los 3 repartidores de los datos de prueba son 3 comparaciones, pero la
+        complejidad sigue siendo lineal en R.)
     Complejidad Espacial:
       - O(1) variables escalares.
 
@@ -151,3 +157,34 @@ def asignar_pedido_emergencia(
     tiempo_ms = (t_fin - t_inicio) * 1000.0
 
     return mejor_repartidor, round(menor_distancia, 2), round(tiempo_ms, 3)
+
+
+def mochila_voraz_por_densidad(
+    pedidos: List[Pedido], capacidad_peso_kg: float
+) -> Tuple[float, List[Pedido]]:
+    """
+    Heurística voraz para la mochila: toma los pedidos de mayor valor por kg
+    (valor/peso) mientras quepan. Sirve de contraste con la Mochila 0/1 por PD.
+
+    Paradigma: Greedy. No garantiza el óptimo en la mochila 0/1 (sí en la fraccionaria).
+    Contraejemplo clásico: pesos (1, 2, 3), valores (15, 10, 30), W = 4: el voraz toma
+    1 y 2 (valor 25) y luego no cabe el 3; el óptimo es 1 + 3 (valor 45).
+
+    Complejidad Temporal: O(n log n) por el Merge Sort manual + O(n) del recorrido.
+    Complejidad Espacial: O(n).
+    """
+    from core.estructuras import merge_sort
+
+    def _densidad(p: Pedido) -> float:
+        return p.valor_soles / p.peso_kg if p.peso_kg > 0 else float("inf")
+
+    ordenados = merge_sort(pedidos, key=_densidad, reverse=True)
+    elegidos: List[Pedido] = []
+    carga = 0.0
+    valor = 0.0
+    for p in ordenados:
+        if carga + p.peso_kg <= capacidad_peso_kg + 1e-9:
+            elegidos.append(p)
+            carga += p.peso_kg
+            valor += p.valor_soles
+    return valor, elegidos

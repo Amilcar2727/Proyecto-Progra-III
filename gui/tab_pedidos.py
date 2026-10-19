@@ -7,7 +7,7 @@ Permite dar de alta nuevos pedidos mediante formulario.
 
 import tkinter as tk
 from tkinter import ttk, messagebox
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 from core.modelos import Grafo, Pedido
 from core.estructuras import (
     merge_sort,
@@ -23,10 +23,19 @@ from core.grafo import obtener_matriz_distancias
 class TabPedidos(ttk.Frame):
     """Pestaña que visualiza y administra los pedidos de reparto."""
 
-    def __init__(self, master, pedidos: List[Pedido], grafo: Grafo, *args, **kwargs):
+    def __init__(
+        self,
+        master,
+        pedidos: List[Pedido],
+        grafo: Grafo,
+        al_informar: Optional[Callable[[str], None]] = None,
+        *args,
+        **kwargs,
+    ):
         super().__init__(master, *args, **kwargs)
         self.pedidos = pedidos
         self.grafo = grafo
+        self.al_informar = al_informar or (lambda _texto: None)
         self.pedidos_actuales = list(pedidos)
 
         # Construcción de índices para búsquedas eficientes
@@ -152,6 +161,19 @@ class TabPedidos(ttk.Frame):
         self.tabla.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
 
+        # Colores por prioridad para que el orden por urgencia se vea de un vistazo
+        self.tabla.tag_configure("p1", background="#fee2e2")
+        self.tabla.tag_configure("p2", background="#fef9c3")
+        self.tabla.tag_configure("p3", background="#ffffff")
+
+        # Resultado de la última operación (en lugar de ventanas emergentes)
+        self.lbl_resultado = ttk.Label(
+            self, text="Ordena o busca para ver aquí el algoritmo usado y su costo.",
+            font=("Segoe UI", 9, "italic"), foreground="#1e3a8a", padding=(10, 0, 10, 6),
+        )
+        self.lbl_resultado.pack(fill=tk.X)
+        self.entry_busqueda.bind("<Return>", lambda _e: self._al_buscar())
+
     def refrescar_tabla(self, lista_pedidos: List[Pedido]):
         for item in self.tabla.get_children():
             self.tabla.delete(item)
@@ -174,6 +196,7 @@ class TabPedidos(ttk.Frame):
                     f"S/. {p.valor_soles:.2f}",
                     f"{d_centro:,.1f}" if d_centro != float("inf") else "Inalcanzable",
                 ),
+                tags=(f"p{p.prioridad}",),
             )
         self.lbl_total.config(text=f"Mostrando: {len(lista_pedidos)} pedidos")
 
@@ -205,15 +228,25 @@ class TabPedidos(ttk.Frame):
 
         self.pedidos_actuales = ordenados
         self.refrescar_tabla(self.pedidos_actuales)
-        messagebox.showinfo(
-            "Ordenación Completa",
-            f"Se ordenaron {len(ordenados)} pedidos usando {nombre_algo} a mano con criterio '{criterio}'.",
+        self._informar(
+            f"Ordenados {len(ordenados)} pedidos con {nombre_algo} (implementación manual), "
+            f"criterio: {criterio}."
         )
+
+    def _informar(self, texto: str):
+        self.lbl_resultado.config(text=texto)
+        self.al_informar(texto)
+
+    def _mostrar_resultado_busqueda(self, encontrados: List[Pedido], texto: str):
+        # La lista filtrada pasa a ser la actual: "Ordenar" ordena solo lo encontrado.
+        self.pedidos_actuales = list(encontrados)
+        self.refrescar_tabla(self.pedidos_actuales)
+        self._informar(texto)
 
     def _al_buscar(self):
         termino = self.entry_busqueda.get().strip()
         if not termino:
-            messagebox.showwarning("Atención", "Ingresa un término de búsqueda.")
+            self._informar("Escribe un ID (p. ej. PED-005) o un sector (p. ej. Wanchaq).")
             return
 
         tipo = self.combo_tipo_busq.get()
@@ -221,10 +254,11 @@ class TabPedidos(ttk.Frame):
         if "Por ID (O(1)" in tipo:
             pedido = self.indice_id.get(termino.upper())
             if pedido:
-                self.refrescar_tabla([pedido])
-                messagebox.showinfo("Búsqueda O(1) Hash", f"Pedido {pedido.id} encontrado: {pedido.cliente}")
+                self._mostrar_resultado_busqueda(
+                    [pedido], f"Tabla hash (dict) O(1): {pedido.id} encontrado -> {pedido.cliente}."
+                )
             else:
-                messagebox.showinfo("Búsqueda O(1) Hash", f"No se encontró el pedido con ID '{termino}'.")
+                self._mostrar_resultado_busqueda([], f"Tabla hash O(1): no existe el ID '{termino}'.")
 
         elif "Búsqueda Binaria" in tipo:
             # Requisito de búsqueda binaria: arreglo ordenado por clave
@@ -232,13 +266,13 @@ class TabPedidos(ttk.Frame):
             idx = busqueda_binaria(pedidos_por_id, termino.upper(), key=lambda p: p.id)
             if idx != -1:
                 pedido = pedidos_por_id[idx]
-                self.refrescar_tabla([pedido])
-                messagebox.showinfo(
-                    "Búsqueda Binaria O(log n)",
-                    f"Pedido {pedido.id} encontrado en índice ordenado {idx} en O(log n) comparaciones.",
+                self._mostrar_resultado_busqueda(
+                    [pedido],
+                    f"Búsqueda binaria O(log n): {pedido.id} está en la posición {idx} de la "
+                    f"lista ordenada por ID (≤ {len(pedidos_por_id).bit_length()} comparaciones).",
                 )
             else:
-                messagebox.showinfo("Búsqueda Binaria O(log n)", f"ID '{termino}' no hallado en la lista.")
+                self._mostrar_resultado_busqueda([], f"Búsqueda binaria: el ID '{termino}' no existe.")
 
         elif "Por Sector" in tipo:
             resultados = []
@@ -246,18 +280,29 @@ class TabPedidos(ttk.Frame):
                 if termino.lower() in sector_nombre.lower():
                     resultados.extend(lista)
 
-            if resultados:
-                self.refrescar_tabla(resultados)
-                messagebox.showinfo(
-                    "Índice Invertido O(1)",
-                    f"Se encontraron {len(resultados)} pedidos para el sector '{termino}'.",
-                )
-            else:
-                messagebox.showinfo("Índice Invertido", f"No hay pedidos en sectores que coincidan con '{termino}'.")
+            self._mostrar_resultado_busqueda(
+                resultados,
+                f"Índice invertido por sector: {len(resultados)} pedidos en sectores que "
+                f"contienen '{termino}' (consulta O(1) por sector, O(S) al comparar los S sectores)."
+                if resultados else f"Ningún sector coincide con '{termino}'.",
+            )
 
     def _restablecer_lista(self):
         self.pedidos_actuales = list(self.pedidos)
         self.refrescar_tabla(self.pedidos_actuales)
+
+    def refrescar(self):
+        """Al volver a la pestaña, recalcula distancias (pueden cambiar si se cerró una calle)."""
+        self.refrescar_tabla(self.pedidos_actuales)
+
+    def _siguiente_id(self) -> str:
+        """ID único: uno más que el mayor número usado (no depende de len, que puede repetir)."""
+        mayor = 0
+        for p in self.pedidos:
+            sufijo = p.id.rsplit("-", 1)[-1]
+            if sufijo.isdigit():
+                mayor = max(mayor, int(sufijo))
+        return f"PED-{mayor + 1:03d}"
 
     def abrir_formulario_alta(
         self, coordenadas: Optional[Tuple[float, float]] = None
@@ -274,7 +319,7 @@ class TabPedidos(ttk.Frame):
 
         ttk.Label(frame, text="Alta de Pedido de Reparto", font=("Segoe UI", 12, "bold")).pack(pady=(0, 10))
 
-        nuevo_id = f"PED-{len(self.pedidos) + 1:03d}"
+        nuevo_id = self._siguiente_id()
 
         ttk.Label(frame, text=f"ID Asignado: {nuevo_id}", font=("Segoe UI", 9, "italic")).pack(anchor="w")
 
@@ -324,7 +369,7 @@ class TabPedidos(ttk.Frame):
         def _guardar():
             cliente = entry_cliente.get().strip()
             if not cliente:
-                messagebox.showerror("Error", "El cliente es obligatorio.")
+                messagebox.showerror("Error", "El cliente es obligatorio.", parent=ventana)
                 return
             try:
                 prio = int(spin_prio.get())
@@ -334,10 +379,19 @@ class TabPedidos(ttk.Frame):
                 lat = float(entry_lat.get())
                 lon = float(entry_lon.get())
             except ValueError:
-                messagebox.showerror("Error", "Valores numéricos inválidos.")
+                messagebox.showerror("Error", "Valores numéricos inválidos.", parent=ventana)
                 return
             if not -90 <= lat <= 90 or not -180 <= lon <= 180:
-                messagebox.showerror("Error", "Latitud o longitud fuera de rango.")
+                messagebox.showerror("Error", "Latitud o longitud fuera de rango.", parent=ventana)
+                return
+            if prio not in (1, 2, 3):
+                messagebox.showerror("Error", "La prioridad debe ser 1, 2 o 3.", parent=ventana)
+                return
+            if peso <= 0 or vol <= 0 or val < 0:
+                messagebox.showerror(
+                    "Error", "Peso y volumen deben ser mayores que 0 y el valor no negativo.",
+                    parent=ventana,
+                )
                 return
 
             nid, distancia_asignacion = nodo_mas_cercano_haversine(
@@ -360,10 +414,10 @@ class TabPedidos(ttk.Frame):
             self.pedidos.append(p)
             self._actualizar_indices()
             self._restablecer_lista()
-            messagebox.showinfo(
-                "Éxito",
-                f"Pedido {nuevo_id} registrado y asignado a {nodo_obj.id}: "
-                f"{nodo_obj.nombre} ({distancia_asignacion:.1f} m en línea recta).",
+            self._informar(
+                f"Pedido {nuevo_id} registrado y asignado al lugar más cercano {nodo_obj.id}: "
+                f"{nodo_obj.nombre} ({distancia_asignacion:.1f} m en línea recta). "
+                "Ya está disponible en las demás pestañas."
             )
             ventana.destroy()
 

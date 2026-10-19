@@ -14,21 +14,38 @@ from core.grafo import validar_distancias
 from core.modelos import Pedido, Ruta
 
 
+def discretizar_peso(peso_kg: float, escala: int) -> int:
+    """
+    Convierte un peso en kg a unidades enteras de 1/escala kg, redondeando HACIA ARRIBA.
+
+    Redondear hacia arriba garantiza que la solución nunca exceda la capacidad real:
+    un pedido de 2.25 kg con escala 10 ocupa 23 unidades (2.3 kg), nunca 22.
+    El round(..., 6) previo elimina el error de punto flotante (2.2 * 10 = 22.000000000000004).
+    """
+    return math.ceil(round(peso_kg * escala, 6))
+
+
 def resolver_mochila_01(
     pedidos: List[Pedido],
-    capacidad_peso_kg: int,
+    capacidad_peso_kg: float,
+    escala: int = 10,
 ) -> Tuple[float, List[Pedido], List[List[float]]]:
     """
     Resuelve el problema de la Mochila 0/1 para maximizar el valor de pedidos sin exceder peso.
 
     Paradigma: Programación Dinámica (PD).
     Principio: Subestructura Óptima y Subproblemas Solapados (Principio de Optimalidad de Bellman).
-    
-    Ecuación de Recurrencia:
+
+    Discretización: la tabla se indexa por enteros, así que los pesos se expresan en
+    unidades de 1/escala kg (escala = 10 -> precisión de 0.1 kg). Los pesos se redondean
+    hacia arriba y la capacidad hacia abajo, por lo que la carga elegida nunca supera la
+    capacidad real. (La versión anterior redondeaba al kg más cercano y podía exceder
+    la capacidad: p. ej. 5.2 kg con capacidad 5 kg.)
+
+    Ecuación de Recurrencia (w en unidades de 1/escala kg):
       DP[i][w] = valor máximo usando un subconjunto de los primeros i pedidos con peso <= w.
       - Caso Base:
           DP[0][w] = 0   para todo w in [0..W]
-          DP[i][0] = 0   para todo i in [0..N]
       - Paso Inductivo:
           Si peso[i] > w:
               DP[i][w] = DP[i-1][w]
@@ -36,24 +53,34 @@ def resolver_mochila_01(
               DP[i][w] = max(DP[i-1][w], DP[i-1][w - peso[i]] + valor[i])
 
     Complejidad Temporal:
-      - O(N · W), donde N es el número de pedidos y W es la capacidad discreta en kg.
-      - Es pseudo-polinomial (polinomial respecto al valor numérico de W, exponencial respecto a bits).
-    
+      - O(N · W), con W = capacidad_kg · escala (número de columnas de la tabla).
+      - Es pseudo-polinomial: depende del VALOR numérico de W, no del tamaño de su
+        representación. Multiplicar la precisión por 10 multiplica el tiempo por 10.
+
     Complejidad Espacial:
       - O(N · W) para almacenar la tabla DP bidimensional y permitir la reconstrucción.
 
     :param pedidos: Lista de pedidos disponibles.
-    :param capacidad_peso_kg: Capacidad entera máxima (kg).
+    :param capacidad_peso_kg: Capacidad máxima en kg (admite decimales).
+    :param escala: Unidades por kg de la tabla (10 = precisión de 0.1 kg).
     :return: Tupla con (valor_maximo, lista_pedidos_seleccionados, matriz_dp_completa).
+             La matriz tiene W + 1 columnas; la columna c equivale a c / escala kg.
     """
+    if escala < 1:
+        raise ValueError("La escala de discretización debe ser >= 1.")
+    if capacidad_peso_kg < 0:
+        raise ValueError("La capacidad no puede ser negativa.")
+
     n = len(pedidos)
-    w_max = int(capacidad_peso_kg)
+    w_max = math.floor(round(capacidad_peso_kg * escala, 6))
 
     # Inicializar matriz DP de tamaño (n + 1) x (w_max + 1) con ceros
     dp: List[List[float]] = [[0.0 for _ in range(w_max + 1)] for _ in range(n + 1)]
 
-    # Pesos discretizados a enteros >= 1 kg para indexar la matriz
-    pesos = [max(1, int(round(p.peso_kg))) for p in pedidos]
+    # Pesos discretizados (redondeo hacia arriba) para indexar la matriz
+    if any(p.peso_kg < 0 for p in pedidos):
+        raise ValueError("Los pesos de los pedidos no pueden ser negativos.")
+    pesos = [discretizar_peso(p.peso_kg, escala) for p in pedidos]
     valores = [p.valor_soles for p in pedidos]
 
     # Llenado de la tabla DP de abajo hacia arriba (Bottom-Up)

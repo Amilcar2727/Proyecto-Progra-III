@@ -4,6 +4,8 @@ Encapsula TkinterMapView y realiza conmutación transparente a CanvasFallback
 si no hay conexión o se produce un error en la carga de tiles.
 """
 
+import os
+import socket
 import tkinter as tk
 from tkinter import ttk
 from typing import Callable, Dict, List, Optional, Tuple
@@ -18,6 +20,26 @@ except ImportError:
     TIKINTER_MAP_VIEW_DISPONIBLE = False
 
 from gui.canvas_fallback import CanvasFallback
+
+_HAY_INTERNET: Optional[bool] = None
+
+
+def hay_conexion_tiles() -> bool:
+    """
+    Comprueba UNA vez (y guarda el resultado) si el servidor de tiles responde.
+    Sin conexión, TkinterMapView mostraría un fondo gris vacío; en ese caso se usa
+    directamente el Canvas vectorial. Forzar modo offline: RUTAS_OFFLINE=1.
+    """
+    global _HAY_INTERNET
+    if os.environ.get("RUTAS_OFFLINE") == "1":
+        return False
+    if _HAY_INTERNET is None:
+        try:
+            with socket.create_connection(("tile.openstreetmap.org", 443), timeout=1.5):
+                _HAY_INTERNET = True
+        except OSError:
+            _HAY_INTERNET = False
+    return _HAY_INTERNET
 
 
 class ComponenteMapa(ttk.Frame):
@@ -45,12 +67,13 @@ class ComponenteMapa(ttk.Frame):
         self.marcadores_dict = {}
         self.caminos_grafo_dict = {}
         self.caminos_rutas_lista = []
+        self.version_dibujada = -1
 
         self._crear_widget_mapa()
 
     def _crear_widget_mapa(self):
         """Inicializa TkinterMapView o salta a CanvasFallback si falla."""
-        if TIKINTER_MAP_VIEW_DISPONIBLE:
+        if TIKINTER_MAP_VIEW_DISPONIBLE and hay_conexion_tiles():
             try:
                 mapa = tkintermapview.TkinterMapView(
                     self,
@@ -139,6 +162,7 @@ class ComponenteMapa(ttk.Frame):
             return
 
         self.limpiar_todo()
+        self.version_dibujada = self.grafo.version
 
         # Ajustar límites geográficos para Canvas si estamos en fallback
         if self.modo_fallback:
@@ -174,6 +198,15 @@ class ComponenteMapa(ttk.Frame):
             par_clave = (arista.origen_id, arista.destino_id)
             self.caminos_grafo_dict[par_clave] = path_obj
 
+        # Señal "CERRADA" en el punto medio de cada calle cerrada (una por calle)
+        for u, v in self.grafo.calles_cerradas():
+            arista = self.grafo.adyacencia.get(u, {}).get(v) or self.grafo.adyacencia[v][u]
+            lat, lon = arista.geometria[len(arista.geometria) // 2]
+            self.widget_mapa.set_marker(
+                lat, lon, text=f"✖ CERRADA {u}–{v}",
+                marker_color_circle=config.COLOR_CALLE_BLOQUEADA, text_color="#b91c1c",
+            )
+
         # 2. Dibujar nodos
         for nodo_id, nodo in self.grafo.nodos.items():
             marcador = self.widget_mapa.set_marker(
@@ -185,6 +218,10 @@ class ComponenteMapa(ttk.Frame):
                 data=nodo_id,
             )
             self.marcadores_dict[nodo_id] = marcador
+
+    def esta_desactualizado(self) -> bool:
+        """True si el grafo cambió (p. ej. una calle cerrada) desde el último dibujo."""
+        return self.grafo is not None and self.version_dibujada != self.grafo.version
 
     def resaltar_ruta(
         self,
@@ -209,6 +246,34 @@ class ComponenteMapa(ttk.Frame):
                 name=nombre_ruta,
             )
             self.caminos_rutas_lista.append(path_obj)
+
+    def resaltar_camino_aristas(
+        self,
+        camino: List[str],
+        color: str = config.COLOR_RUTA_BACKTRACKING,
+        ancho: int = 5,
+        nombre_ruta: str = "",
+    ):
+        """
+        Dibuja un camino usando EXACTAMENTE las aristas u->v que lo forman.
+        (resaltar_ruta, en cambio, une paradas por el camino mínimo de Dijkstra, que
+        entre dos lugares vecinos podría no ser la arista directa.) Lo usa Backtracking.
+        """
+        if not self.grafo or len(camino) < 2:
+            return
+        puntos: List[Tuple[float, float]] = []
+        for u, v in zip(camino, camino[1:]):
+            geometria = self.grafo.adyacencia[u][v].geometria
+            if puntos and puntos[-1] == geometria[0]:
+                puntos.extend(geometria[1:])
+            else:
+                puntos.extend(geometria)
+        if len(puntos) >= 2:
+            self.caminos_rutas_lista.append(
+                self.widget_mapa.set_path(
+                    position_list=puntos, color=color, width=ancho, name=nombre_ruta
+                )
+            )
 
     def agregar_marcador_pedido(
         self,

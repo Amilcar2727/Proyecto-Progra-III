@@ -11,6 +11,7 @@ import config
 from core.modelos import Grafo, Pedido, Repartidor
 from core.greedy import vecino_mas_cercano, asignar_pedido_emergencia
 from gui.componente_mapa import ComponenteMapa
+from gui.panel_desplazable import crear_panel_lateral
 
 
 class TabGreedy(ttk.Frame):
@@ -33,8 +34,7 @@ class TabGreedy(ttk.Frame):
         self._crear_interfaz()
 
     def _crear_interfaz(self):
-        panel_izq = ttk.Frame(self, width=340, padding=12)
-        panel_izq.pack(side=tk.LEFT, fill=tk.Y)
+        panel_izq = crear_panel_lateral(self, ancho=340, padding=12)
 
         ttk.Label(
             panel_izq,
@@ -112,6 +112,19 @@ class TabGreedy(ttk.Frame):
         self.componente_mapa.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         self.componente_mapa.dibujar_grafo()
 
+    def refrescar(self):
+        """Actualiza listas si se registraron pedidos nuevos y redibuja si cambió el grafo."""
+        self.spin_n.config(to=len(self.pedidos))
+        urgentes = [f"{p.id} | {p.cliente} ({p.sector})" for p in self.pedidos if p.prioridad == 1]
+        actual = self.cb_emergencia.get()
+        self.cb_emergencia["values"] = urgentes
+        if actual in urgentes:
+            self.cb_emergencia.set(actual)
+        elif urgentes:
+            self.cb_emergencia.current(0)
+        if self.componente_mapa.esta_desactualizado():
+            self.componente_mapa.dibujar_grafo()
+
     def _ejecutar_vecino_cercano(self):
         sel_origen = self.cb_origen.get()
         if not sel_origen:
@@ -122,6 +135,9 @@ class TabGreedy(ttk.Frame):
             n_pedidos = int(self.spin_n.get())
         except ValueError:
             n_pedidos = 8
+        if n_pedidos < 1:
+            messagebox.showerror("Error", "N debe ser al menos 1.")
+            return
 
         sub_pedidos = self.pedidos[:n_pedidos]
         try:
@@ -143,16 +159,28 @@ class TabGreedy(ttk.Frame):
             ancho=5,
             nombre_ruta="Ruta Greedy",
         )
+        # Numerar las entregas en el orden que eligió el algoritmo
+        por_id = {p.id: p for p in sub_pedidos}
+        for orden, pid in enumerate(ruta.pedidos_cubiertos, start=1):
+            p = por_id[pid]
+            self.componente_mapa.agregar_marcador_pedido(
+                p.lat, p.lon, f"{orden}. {p.id}", color=config.COLOR_RUTA_GREEDY
+            )
 
         # Mostrar métricas
         self.txt_resultados.delete("1.0", tk.END)
         self.txt_resultados.insert(tk.END, "=== RESULTADOS GREEDY (TSP) ===\n")
         self.txt_resultados.insert(tk.END, f"Algoritmo: {ruta.algoritmo_utilizado}\n")
-        self.txt_resultados.insert(tk.END, f"Complejidad: O(n²) tiempo, O(n) espacio\n")
+        self.txt_resultados.insert(tk.END, "Complejidad: O(n²) tiempo, O(n) espacio\n")
         self.txt_resultados.insert(tk.END, f"Distancia total por calles: {ruta.distancia_total_m:,.2f} m\n")
         self.txt_resultados.insert(tk.END, f"Tiempo de cómputo: {ruta.tiempo_computo_ms:.3f} ms\n")
         self.txt_resultados.insert(tk.END, f"Paradas: {len(ruta.secuencia_nodos)} nodos\n")
         self.txt_resultados.insert(tk.END, f"Secuencia: {' -> '.join(ruta.secuencia_nodos)}\n")
+        self.txt_resultados.insert(
+            tk.END,
+            "\nNota: decide solo con la distancia al punto más próximo; "
+            "no garantiza la ruta óptima (compárese con Held-Karp en Prog. Dinámica).\n",
+        )
 
     def _ejecutar_asignacion_emergencia(self):
         sel = self.cb_emergencia.get()
@@ -176,7 +204,9 @@ class TabGreedy(ttk.Frame):
             self.txt_resultados.insert(tk.END, f"Vehículo: {repartidor.tipo_vehiculo}\n")
             self.txt_resultados.insert(tk.END, f"Distancia por calles: {dist:,.2f} m\n")
             self.txt_resultados.insert(tk.END, f"Tiempo de decisión: {t_ms:.3f} ms\n")
-            self.txt_resultados.insert(tk.END, f"Complejidad: O(R) = O(3) -> O(1)\n")
+            self.txt_resultados.insert(
+                tk.END, f"Complejidad: O(R), R = {len(self.repartidores)} repartidores\n"
+            )
 
             # Resaltar en mapa
             self.componente_mapa.dibujar_grafo()

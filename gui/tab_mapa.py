@@ -10,6 +10,7 @@ import config
 from core.geo import distancia_haversine
 from core.modelos import Grafo
 from gui.componente_mapa import ComponenteMapa
+from gui.panel_desplazable import crear_panel_lateral
 
 
 class TabMapa(ttk.Frame):
@@ -34,8 +35,7 @@ class TabMapa(ttk.Frame):
 
     def _crear_interfaz(self):
         # Panel lateral izquierdo (Controles y estadísticas)
-        panel_izq = ttk.Frame(self, width=320, padding=12)
-        panel_izq.pack(side=tk.LEFT, fill=tk.Y)
+        panel_izq = crear_panel_lateral(self, ancho=320, padding=12)
 
         # Título y descripción
         ttk.Label(
@@ -65,6 +65,11 @@ class TabMapa(ttk.Frame):
             frame_metricas, text="Calles bloqueadas: 0", font=("Segoe UI", 9, "bold"), foreground="#dc2626"
         )
         self.lbl_bloqueadas.pack(anchor="w")
+
+        self.lbl_ultima_accion = ttk.Label(
+            frame_metricas, text="", font=("Segoe UI", 8, "italic"), foreground="#475569"
+        )
+        self.lbl_ultima_accion.pack(anchor="w")
 
         # Control interactivo de bloqueo de calles
         frame_bloqueo = ttk.LabelFrame(panel_izq, text="Bloquear / Desbloquear Calle", padding=10)
@@ -192,8 +197,8 @@ class TabMapa(ttk.Frame):
         self.grafo.cambiar_estado_calle(u_id, v_id, activa=estado_actual)
         self.componente_mapa.dibujar_grafo()
         self.actualizar_estadisticas()
-        msg = "bloqueada" if nuevo_estado else "reabierta"
-        print(f"Calle {u_id} <-> {v_id} fue {msg}.")
+        msg = "cerrada" if nuevo_estado else "reabierta"
+        self.lbl_ultima_accion.config(text=f"Calle {u_id} ↔ {v_id} {msg}.")
 
     def _alternar_calle_desde_combos(self):
         sel_a = self.cb_nodo_a.get()
@@ -219,6 +224,8 @@ class TabMapa(ttk.Frame):
         self.grafo.cambiar_estado_calle(id_a, id_b, activa=bloqueada)
         self.componente_mapa.dibujar_grafo()
         self.actualizar_estadisticas()
+        estado = "reabierta" if bloqueada else "cerrada"
+        self.lbl_ultima_accion.config(text=f"Calle {id_a} ↔ {id_b} {estado}.")
 
     def _restablecer_calles(self):
         for arista in self.grafo.todas_las_aristas():
@@ -233,6 +240,12 @@ class TabMapa(ttk.Frame):
             self.componente_mapa.cambiar_proveedor_tiles(config.TILES_GOOGLE_NORMAL)
         else:
             self.componente_mapa.cambiar_proveedor_tiles(config.TILES_OPENSTREETMAP)
+
+    def refrescar(self):
+        """Al volver a la pestaña: refleja calles cerradas desde otras pestañas."""
+        if self.componente_mapa.esta_desactualizado():
+            self.componente_mapa.dibujar_grafo()
+        self.actualizar_estadisticas()
 
     def actualizar_estadisticas(self):
         n_nodos = len(self.grafo.nodos)

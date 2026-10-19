@@ -46,7 +46,7 @@ COLOR_CALLE_BLOQUEADA = "#dc2626"     # Rojo intenso
 COLOR_RUTA_GREEDY = "#059669"         # Verde esmeralda
 COLOR_RUTA_HELD_KARP = "#7c3aed"     # Púrpura
 COLOR_RUTA_BACKTRACKING = "#d97706"  # Ámbar
-COLOR_RUTA_OPTIMA = "#e11d48"         # Rosa rojizo brillante
+COLOR_RUTA_OPTIMA = "#2563eb"         # Azul intenso (contrasta con calles cerradas en rojo)
 COLOR_REPARTIDOR = "#0284c7"          # Celeste
 
 # Colores para Zonas de Divide y Vencerás

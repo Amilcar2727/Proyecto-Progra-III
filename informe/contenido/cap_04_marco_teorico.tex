@@ -1,79 +1,116 @@
 \chapter{Marco Teórico}
 
-En este capítulo se presentan los fundamentos teóricos que sustentan el diseño e implementación del sistema. Se abordan los conceptos de grafos, los paradigmas algorítmicos implementados, los problemas de optimización combinatoria subyacentes y la notación de complejidad computacional empleada para el análisis.
+En este capítulo se presentan los fundamentos teóricos que sustentan el diseño e implementación del sistema: el modelo de la red vial, los paradigmas algorítmicos aplicados, el análisis de complejidad de cada algoritmo implementado y la notación empleada.
 
 \section{Antecedentes}
 
-\citet{dantzig1959truck} formularon el Problema de Enrutamiento de Vehículos (VRP) como generalización del TSP con múltiples vehículos y capacidad limitada, estableciendo las bases formales del problema que este proyecto aborda en escala reducida. Su trabajo demostró que la planificación óptima de rutas es NP-difícil en el caso general, lo que motiva el uso de heurísticas y algoritmos exactos de complejidad exponencial acotada.
+\citet{dantzig1959truck} formularon el Problema de Enrutamiento de Vehículos (VRP) como generalización del TSP con múltiples vehículos y capacidad limitada, estableciendo las bases formales del problema que este proyecto aborda en escala reducida. La planificación óptima de rutas es NP-difícil en el caso general, lo que motiva el uso combinado de heurísticas y algoritmos exactos de costo exponencial acotado.
 
-\citet{held1962dynamic} propusieron el algoritmo de Programación Dinámica para el TSP que lleva su nombre (Held-Karp), reduciendo la complejidad de la fuerza bruta $O(n!)$ a $O(2^n \cdot n^2)$ mediante la técnica de memoización sobre subconjuntos de nodos visitados. Este es el algoritmo exacto implementado en el presente proyecto para la optimización de rutas de reparto.
+\citet{dijkstra1959note} propuso el algoritmo de caminos mínimos desde un origen en grafos con pesos no negativos, que en este proyecto se usa para calcular la distancia por calles entre cada par de lugares de interés.
 
-\citet{rosenkrantz1977analysis} analizaron heurísticas constructivas para el TSP, incluyendo la heurística del vecino más cercano (\textit{nearest neighbor}), que constituye la base del enfoque Greedy implementado en este trabajo. Sus resultados establecen que esta heurística produce rutas de a lo sumo el doble de la longitud óptima en el peor caso.
+\citet{held1962dynamic} propusieron el algoritmo de Programación Dinámica para el TSP que lleva su nombre, reduciendo la complejidad de la fuerza bruta $O(n!)$ a $O(n^2 2^n)$ mediante memoización sobre subconjuntos de nodos visitados.
 
-\citet{cormen2022introduction} proporcionan el tratamiento algorítmico formal de los paradigmas implementados: Divide y Vencerás (Merge Sort, capítulo 2), Programación Dinámica (Knapsack 0/1, capítulo 16) y Backtracking (capítulo 34), así como el análisis de complejidad Big-O utilizado en este informe.
+\citet{rosenkrantz1977analysis} analizaron heurísticas constructivas para el TSP, entre ellas la del vecino más cercano, base del enfoque Greedy implementado, y demostraron que, en instancias métricas, puede alejarse del óptimo en un factor que crece con $\log n$; en una red dirigida como la de este proyecto ni siquiera esa cota está garantizada.
 
-\citet{toth2014vehicle} presentan una revisión exhaustiva de métodos exactos y heurísticos para el VRP con restricciones de capacidad (CVRP), contextualizando el problema de selección y secuenciación de pedidos en el marco de la logística moderna.
+\citet{cormen2022introduction} proporcionan el tratamiento formal de los paradigmas implementados y del Teorema Maestro empleado en el análisis de recurrencias. \citet{toth2014vehicle} contextualizan la selección y secuenciación de pedidos con capacidad (CVRP) dentro de la logística moderna.
 
 \section{Bases Teóricas}
 
-\subsection{Grafos y Representación de la Red Vial}
+\subsection{Modelo de la red vial}
 
-Un grafo $G = (V, E)$ consiste en un conjunto de vértices $V$ (nodos) y un conjunto de aristas $E \subseteq V \times V$. En este proyecto, cada nodo $v_i \in V$ representa una ubicación georreferenciada en Cusco, caracterizada por una latitud $\phi_i$ y longitud $\lambda_i$. Cada arista $e_{ij} = (v_i, v_j, w_{ij}) \in E$ representa una conexión vial entre dos nodos con peso $w_{ij}$ igual a la distancia ortodrómica calculada mediante la fórmula de Haversine:
+La ciudad se representa con un grafo dirigido y ponderado $G=(V,E)$. Cada vértice $v\in V$ es uno de los 20 lugares de interés (Plaza de Armas, San Blas, Wanchaq, etc.), con latitud, longitud y sector. Cada arco $(u,v)\in E$ es un recorrido por calles reales entre dos lugares, obtenido de OpenStreetMap con perfil vehicular: su peso $w(u,v)$ es la suma de las longitudes de los tramos de calle, en metros, y conserva la polilínea para dibujarlo. Como existen calles de un solo sentido, $w(u,v)$ puede ser distinto de $w(v,u)$, o uno de los dos arcos puede no existir; la red usada tiene $|E|=64$ arcos dirigidos: 20 pares en ambos sentidos y 24 arcos de un solo sentido.
 
+El grafo se almacena como diccionario de adyacencia \texttt{adyacencia[u][v]} $\to$ arista, que ocupa $O(|V|+|E|)$, recorre los vecinos de un nodo en $O(\deg(u))$ y consulta una arista concreta en $O(1)$ promedio. Se eligió frente a la matriz de adyacencia porque la red urbana es dispersa (en promedio 3.2 arcos de salida por lugar), de modo que la matriz desperdiciaría $O(|V|^2)$ espacio y obligaría a recorrer filas completas para obtener vecinos. Cada arista lleva además un indicador \texttt{activa}: cerrar una calle lo pone en falso en ambos sentidos sin modificar la estructura del grafo.
+
+\textbf{Distancias mínimas (Dijkstra).} Los algoritmos de ruta necesitan la distancia por calles entre lugares que no son vecinos directos. Se ejecuta Dijkstra con cola de prioridad (\texttt{heapq}) desde cada uno de los $|V|$ lugares, ignorando las calles cerradas:
 \begin{equation}
-    d(i,j) = 2R \cdot \arcsin\!\left(\sqrt{\sin^2\!\left(\tfrac{\phi_j - \phi_i}{2}\right) + \cos\phi_i\cos\phi_j\sin^2\!\left(\tfrac{\lambda_j - \lambda_i}{2}\right)}\right)
-    \label{eq:haversine}
+    T_{\text{matriz}} = |V|\cdot O\big((|V|+|E|)\log|V|\big), \qquad S_{\text{matriz}} = O(|V|^2).
 \end{equation}
+El resultado se guarda en caché y se invalida automáticamente cada vez que se cierra o reabre una calle. Con la matriz disponible, la distancia entre dos lugares se consulta en $O(1)$, y por eso los algoritmos siguientes suponen $d(u,v)$ de costo constante.
 
-donde $R = 6{,}371{,}000$ m es el radio medio de la Tierra \citep{cormen2022introduction}. El grafo se almacena como diccionario de listas de adyacencia, estructura que permite recorrer los vecinos de un nodo en $O(\deg(v))$ y ocupa $O(|V| + |E|)$ de espacio.
+La distancia en línea recta (fórmula de Haversine) se usa solo para asignar un pedido nuevo, ingresado por coordenadas, al lugar de interés más cercano, y para mostrar en la interfaz el factor de desvío entre la línea recta y el recorrido por calles.
+
+\subsection{Estructuras, ordenación y búsqueda}
+
+\begin{itemize}
+    \item \textbf{Merge Sort}: divide la lista en dos mitades, las ordena recursivamente y las mezcla. $T(n)=2T(n/2)+\Theta(n)=\Theta(n\log n)$ en todos los casos; espacio $O(n)$; es estable.
+    \item \textbf{Quick Sort} (partición de Lomuto, pivote por mediana de tres): $\Theta(n\log n)$ en promedio y $O(n^2)$ en el peor caso; espacio $O(\log n)$ promedio por la pila de recursión.
+    \item \textbf{Búsqueda por ID con tabla hash} (\texttt{dict}): construcción $O(n)$, consulta $O(1)$ promedio.
+    \item \textbf{Búsqueda binaria} sobre la lista ordenada por ID: $O(\log n)$ comparaciones, espacio $O(1)$.
+    \item \textbf{Índice invertido por sector}: \texttt{sector} $\to$ lista de pedidos; construcción $O(n)$ y consulta $O(1)$ por sector.
+\end{itemize}
 
 \subsection{Paradigma Greedy}
 
-Un algoritmo \textit{Greedy} construye una solución paso a paso, tomando en cada etapa la decisión localmente óptima sin reconsiderar elecciones anteriores \citep{cormen2022introduction}. En este proyecto se aplica para la selección de pedidos: se calcula para cada pedido $p_i$ su densidad $\delta_i = \text{prioridad}_i / (\text{peso}_i \cdot d_i)$, donde $d_i$ es la distancia desde el depósito hasta el nodo del pedido. Los pedidos se ordenan de mayor a menor $\delta_i$ y se seleccionan en ese orden mientras la capacidad restante del repartidor lo permita. Este proceso tiene complejidad $O(n \log n)$ por el ordenamiento y $O(n)$ para la selección, resultando en $O(n \log n)$ total.
+Un algoritmo \textit{Greedy} construye la solución paso a paso tomando en cada etapa la mejor decisión local, sin reconsiderar decisiones anteriores \citep{cormen2022introduction}. Se aplica en tres puntos:
+
+\textbf{Vecino más cercano.} Desde la posición actual, el repartidor visita el pedido pendiente con menor $d(\text{actual},p)$. En la iteración $i$ se comparan $n-i$ candidatos:
+\begin{equation}
+    T(n)=\sum_{i=0}^{n-1}(n-i)=\frac{n(n+1)}{2}=O(n^2), \qquad S(n)=O(n).
+\end{equation}
+
+\textbf{Pedido de emergencia.} Se asigna el pedido urgente al repartidor con capacidad suficiente cuya distancia por calles al destino sea mínima: una comparación por repartidor, $O(R)$ tiempo y $O(1)$ espacio.
+
+\textbf{Mochila voraz} (solo como referencia de comparación). Ordena los pedidos por valor/kg con Merge Sort y los toma mientras quepan: $O(n\log n)$. No garantiza el óptimo de la mochila 0/1: con pesos $(1,2,3)$, valores $(15,10,30)$ y $W=4$ toma los dos primeros (valor 25), cuando el óptimo es el primero y el tercero (valor 45).
 
 \subsection{Paradigma Divide y Vencerás}
 
-El paradigma \textit{Divide y Vencerás} divide el problema en subproblemas del mismo tipo, los resuelve recursivamente y combina sus soluciones \citep{cormen2022introduction}. En este proyecto se implementa mediante el algoritmo \textbf{Merge Sort} para ordenar la lista de pedidos por distancia al depósito:
+Divide y Vencerás divide el problema en subproblemas del mismo tipo, los resuelve recursivamente y combina sus soluciones \citep{cormen2022introduction}. Se usa para segmentar la ciudad.
 
-\begin{algorithm}[H]
-\SetAlgoLined
-\KwData{Lista $A$ de $n$ pedidos con distancias}
-\KwResult{Lista $A$ ordenada de menor a mayor distancia}
-\If{$|A| \leq 1$}{\Return $A$}
-$\text{mitad} \leftarrow \lfloor |A|/2 \rfloor$\;
-$L \leftarrow \texttt{merge\_sort}(A[:\text{mitad}])$\;
-$R \leftarrow \texttt{merge\_sort}(A[\text{mitad}:])$\;
-\Return $\texttt{merge}(L, R)$\;
-\caption{Merge Sort para pedidos (Divide y Vencerás)}
-\label{alg:mergesort}
-\end{algorithm}
+\textbf{Partición en zonas de a lo sumo $K$ pedidos.} Si hay más de $K$ pedidos, se ordenan con Quick Sort por latitud (niveles pares) o longitud (niveles impares), se cortan por la mediana y se procesa cada mitad. Como el trabajo no recursivo es ordenar,
+\begin{equation}
+    T(n)=2T(n/2)+\Theta(n\log n).
+\end{equation}
+Con $a=b=2$, $n^{\log_b a}=n$ y $f(n)=\Theta(n\log n)=\Theta(n^{\log_b a}\log^1 n)$; por la forma extendida del caso 2 del Teorema Maestro, $T(n)=\Theta(n\log^{2} n)$. (Si la mediana se obtuviera por selección lineal en lugar de ordenar, $f(n)=\Theta(n)$ y el resultado sería $\Theta(n\log n)$.) Después, un repartidor entra a la zona cuyo pedido más cercano esté a menor distancia y la recorre con vecino más cercano. Con $M=n/K$ zonas, esa elección cuesta $\sum_i (M-i)\,K=O(M^2K)=O(n^2/K)$ y las rutas locales $M\cdot O(K^2)=O(nK)$, por lo que el total es $O(n^2/K)$ en tiempo y $O(n)$ en espacio.
 
-La relación de recurrencia del Merge Sort es $T(n) = 2T(n/2) + O(n)$, cuya solución por el Teorema Maestro es $T(n) = O(n \log n)$, con espacio auxiliar $O(n)$.
+\textbf{Una zona por repartidor} (caso de uso del enunciado). Con $R$ repartidores, la ciudad se divide en exactamente $R$ zonas: si $r=1$ la zona es todo el conjunto; si no, se ordena por el eje del nivel, se corta en la proporción $\lfloor r/2\rfloor:\lceil r/2\rceil$ y se resuelve cada parte con ese número de zonas. El árbol tiene profundidad $\lceil\log_2 R\rceil$ y en cada nivel se ordenan $n$ elementos:
+\begin{equation}
+    T(n,R)=\Theta(n\log n\cdot\log R).
+\end{equation}
+Cada zona se asigna al repartidor más cercano mediante un emparejamiento voraz sobre los $R^2$ pares ordenados por distancia, $O(R^2\log R + Rn)$, y cada repartidor calcula la ruta \emph{óptima} de su zona con Held-Karp cuando tiene a lo sumo 10 pedidos.
 
 \subsection{Programación Dinámica}
 
-La \textit{Programación Dinámica} (PD) resuelve un problema descomponiéndolo en subproblemas superpuestos cuya solución se almacena (\textit{memoización} o tabulación) para evitar recálculos \citep{bellman1957dynamic}.
+La Programación Dinámica resuelve un problema a partir de subproblemas superpuestos cuyas soluciones se almacenan para no recalcularlas, apoyándose en el principio de optimalidad \citep{bellman1957dynamic}.
 
-\textbf{Knapsack 0/1.} Dado un conjunto de pedidos $\{p_1, \ldots, p_n\}$, cada uno con peso $w_i$ y valor $v_i$, y una capacidad máxima $W$, se busca el subconjunto de pedidos que maximice $\sum v_i$ sujeto a $\sum w_i \leq W$. La tabla de PD $dp[i][c]$ representa el valor máximo considerando los primeros $i$ pedidos con capacidad $c$:
-
+\textbf{Mochila 0/1.} Dados $N$ pedidos con peso $w_i$ y valor $v_i$, y una capacidad $W$, se maximiza $\sum v_i$ sujeto a $\sum w_i\le W$. La tabla $dp[i][c]$ guarda el mejor valor usando los primeros $i$ pedidos con capacidad $c$:
 \begin{equation}
-    dp[i][c] = \max\bigl(dp[i-1][c],\; v_i + dp[i-1][c - w_i]\bigr) \quad \text{si } w_i \leq c
+    dp[i][c]=\begin{cases}dp[i-1][c] & \text{si } w_i>c\\ \max\big(dp[i-1][c],\; v_i+dp[i-1][c-w_i]\big) & \text{si } w_i\le c\end{cases}
 \end{equation}
+con $dp[0][c]=0$. La solución se reconstruye recorriendo la tabla hacia atrás: el pedido $i$ se eligió si $dp[i][c]\neq dp[i-1][c]$. Como la tabla se indexa con enteros, los pesos se expresan en unidades de 0.1 kg (escala 10), \emph{redondeando los pesos hacia arriba y la capacidad hacia abajo}, lo que garantiza que la carga elegida nunca supere la capacidad real. La complejidad es $O(N\cdot W)$ en tiempo y espacio, con $W$ la capacidad en décimas de kg: es pseudo-polinomial, porque depende del valor numérico de $W$; multiplicar la precisión por 10 multiplica las columnas de la tabla y el tiempo por 10.
 
-Complejidad: $O(n \cdot W)$ tiempo y $O(n \cdot W)$ espacio (optimizable a $O(W)$ usando una sola fila).
-
-\textbf{Held-Karp (TSP exacto).} Dado un conjunto de nodos de entrega $S = \{s_1, \ldots, s_n\}$ y las distancias $d(i,j)$ entre ellos, el algoritmo Held-Karp calcula la ruta hamiltoniana de mínimo costo que parte del depósito, visita todos los nodos de $S$ exactamente una vez y regresa al depósito \citep{held1962dynamic}. Define:
-
+\textbf{Held-Karp (TSP exacto).} El estado $(\text{mask},u)$ indica el conjunto de puntos ya visitados, codificado en los bits de un entero, y el punto actual $u$. Con memoización se calcula
 \begin{equation}
-    C(S, i) = \min_{j \in S \setminus \{i\}} \bigl[ C(S \setminus \{i\}, j) + d(j, i) \bigr]
+    C(\text{mask},u)=\min_{v\notin\text{mask}}\big[d(u,v)+C(\text{mask}\cup\{v\},v)\big],
 \end{equation}
-
-donde $C(\{i\}, i) = d(\text{depósito}, i)$. El estado $(S, i)$ codifica que se han visitado exactamente los nodos de $S$ y el último visitado fue $i$. Con $n$ nodos de entrega hay $2^n$ subconjuntos y $n$ posibles últimos nodos, dando $O(2^n \cdot n)$ estados y $O(n)$ transiciones por estado: complejidad total $O(2^n \cdot n^2)$ tiempo y $O(2^n \cdot n)$ espacio.
+con caso base $C(\text{todos},u)=d(u,0)$ si se vuelve al inicio o $0$ si el recorrido es abierto. Hay $2^n\cdot n$ estados y cada uno evalúa hasta $n$ transiciones: $O(n^2 2^n)$ tiempo y $O(n\,2^n)$ espacio \citep{held1962dynamic}.
 
 \subsection{Backtracking}
 
-El \textit{Backtracking} es una técnica de búsqueda exhaustiva con poda: construye la solución incrementalmente y abandona una rama de la búsqueda (\textit{retrocede}) tan pronto como detecta que no puede conducir a una solución válida \citep{cormen2022introduction}. En este proyecto se usa para encontrar rutas en el grafo vial que eviten aristas bloqueadas: dado un nodo origen y un nodo destino, el algoritmo explora en profundidad (DFS) todos los caminos posibles, marcando nodos visitados para evitar ciclos y podando si se supera una longitud máxima configurable. En el peor caso, sin bloqueos, el algoritmo recorre todos los caminos simples en el grafo, cuya cantidad es $O(n!)$; en la práctica, la poda y los bloqueos reducen dramáticamente el espacio de búsqueda.
+El Backtracking construye la solución de forma incremental y retrocede al agotar las opciones de una decisión. Para encontrar las rutas de un origen a un destino se usa una búsqueda en profundidad (DFS) sobre caminos simples:
+
+\begin{algorithm}[H]
+\SetAlgoLined
+\KwData{nodo actual $u$, camino, visitados, costo acumulado}
+\eIf{$u$ = destino}{guardar una copia del camino y su costo\;}{
+  \ForEach{vecino $v$ de $u$ por una calle abierta}{
+    \If{$v\notin$ visitados}{
+      agregar $v$ a camino y visitados \tcp*{avanzar}
+      \textsc{Buscar}$(v,\ldots,\text{costo}+w(u,v))$\;
+      quitar $v$ de camino y visitados \tcp*{retroceder}
+    }
+  }
+}
+\caption{Backtracking para todas las rutas simples}
+\label{alg:backtracking}
+\end{algorithm}
+
+Las calles cerradas se excluyen al pedir los vecinos activos, y el conjunto de visitados impide los ciclos. Sin poda, el algoritmo enumera \emph{todas} las rutas simples, como pide el enunciado, y al final se ordenan por distancia para elegir la más corta.
+
+\textbf{Poda por cota (Branch \& Bound).} Opcionalmente se abandona una rama en cuanto su costo parcial iguala o supera la mejor ruta completa encontrada. Como los pesos son no negativos, el costo de una rama solo puede crecer al extenderla: una rama podada nunca terminaría en una ruta más corta, por lo que la poda conserva la ruta óptima y solo reduce el trabajo.
+
+\textbf{Complejidad.} En un grafo de grado medio $b$ y caminos de longitud $d$, el árbol de búsqueda tiene $O(b^d)$ nodos; en el peor caso, un grafo completo, hay $O(V!)$ caminos simples y copiar cada uno cuesta $O(V)$, es decir, $O(V\cdot V!)$. La poda no mejora esta cota asintótica, pero reduce mucho los estados visitados en la práctica. El espacio es $O(V)$ para la pila, el camino y los visitados, más $O(R\cdot V)$ para guardar las $R$ rutas encontradas.
 
 \subsection{Notación Big-O}
 
-La notación $O(f(n))$ describe el crecimiento asintótico del tiempo o espacio de un algoritmo en el peor caso \citep{cormen2022introduction}. Se dice que $T(n) = O(f(n))$ si existen constantes $c > 0$ y $n_0 \geq 0$ tales que $T(n) \leq c \cdot f(n)$ para todo $n \geq n_0$. Las complejidades relevantes para este proyecto, ordenadas de mejor a peor, son: $O(1)$, $O(\log n)$, $O(n)$, $O(n \log n)$, $O(n^2)$, $O(n \cdot W)$ (pseudopolinomial), $O(2^n \cdot n^2)$, $O(n!)$.
+$T(n)=O(f(n))$ si existen constantes $c>0$ y $n_0\ge0$ tales que $T(n)\le c\,f(n)$ para todo $n\ge n_0$; $\Theta$ indica además una cota inferior del mismo orden \citep{cormen2022introduction}. Las complejidades de este proyecto, de menor a mayor, son: $O(1)$, $O(\log n)$, $O(n)$, $O(n\log n)$, $O(n\log^2 n)$, $O(n^2)$, $O(N\cdot W)$ (pseudo-polinomial), $O(n^2 2^n)$ y $O(V\cdot V!)$.

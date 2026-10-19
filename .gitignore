@@ -20,6 +20,10 @@ ENV/
 *.swp
 *.swo
 
+# Informe
+informe/
+docs/
+
 # Archivos auxiliares de compilación LaTeX (en informe/)
 informe/*.aux
 informe/*.bbl

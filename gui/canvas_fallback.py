@@ -15,10 +15,15 @@ class CanvasFallback(tk.Canvas):
     """
 
     def __init__(self, master, *args, **kwargs):
-        super().__init__(master, bg="#f8fafc", highlightthickness=0, *args, **kwargs)
+        # closeenough: tolerancia en píxeles para que una calle de 2 px sea fácil de clicar.
+        super().__init__(
+            master, bg="#f8fafc", highlightthickness=0, closeenough=4, *args, **kwargs
+        )
         self.marcadores: List[dict] = []
         self.caminos: List[dict] = []
         self.callbacks_click: List[Callable] = []
+        self._lineas_clicables: set = set()
+        self._redibujo_pendiente = False
 
         # Rango geográfico predeterminado de Cusco para normalización
         self.min_lat = -13.5450
@@ -39,7 +44,7 @@ class CanvasFallback(tk.Canvas):
         self.max_lat = max_lat + margen_lat
         self.min_lon = min_lon - margen_lon
         self.max_lon = max_lon + margen_lon
-        self.redibujar()
+        self._programar_redibujo()
 
     def geo_a_pixel(self, lat: float, lon: float) -> Tuple[float, float]:
         """Normaliza (lat, lon) al espacio de píxeles del Canvas."""
@@ -98,7 +103,7 @@ class CanvasFallback(tk.Canvas):
             "data": data,
         }
         self.marcadores.append(marcador)
-        self.redibujar()
+        self._programar_redibujo()
         return marcador
 
     def set_path(
@@ -119,27 +124,40 @@ class CanvasFallback(tk.Canvas):
             "data": data,
         }
         self.caminos.append(camino)
-        self.redibujar()
+        self._programar_redibujo()
         return camino
 
     def delete_all_marker(self):
         """Limpia todos los marcadores."""
         self.marcadores.clear()
-        self.redibujar()
+        self._programar_redibujo()
 
     def delete_all_path(self):
         """Limpia todos los caminos."""
         self.caminos.clear()
-        self.redibujar()
+        self._programar_redibujo()
 
     def add_left_click_map_command(self, callback: Callable):
         """Registra callback al hacer clic en el mapa."""
         self.callbacks_click.append(callback)
 
+    def _programar_redibujo(self):
+        """
+        Agrupa muchos set_path/set_marker seguidos en un único redibujo.
+        Antes se redibujaba todo el lienzo en cada llamada: O(k²) para k elementos.
+        """
+        if not self._redibujo_pendiente:
+            self._redibujo_pendiente = True
+            self.after_idle(self.redibujar)
+
     def _al_redimensionar(self, event):
-        self.redibujar()
+        self._programar_redibujo()
 
     def _al_hacer_clic(self, event):
+        # Un clic sobre una calle ya lo atiende su propio manejador; no crear pedido.
+        actuales = set(self.find_withtag("current"))
+        if actuales & self._lineas_clicables:
+            return
         lat, lon = self.pixel_a_geo(event.x, event.y)
         # Notificar a los listeners del mapa
         for cb in self.callbacks_click:
@@ -147,16 +165,16 @@ class CanvasFallback(tk.Canvas):
 
     def redibujar(self):
         """Limpia el canvas y vuelve a trazar caminos y marcadores con las dimensiones actuales."""
+        self._redibujo_pendiente = False
         self.delete("all")
-        w = self.winfo_width()
-        h = self.winfo_height()
+        self._lineas_clicables = set()
 
         # Marca de agua indicando modo fuera de línea
         self.create_text(
             15,
             15,
             anchor="nw",
-            text="[MODO OFFLINE] Renderizado en Canvas 2D Vectorial",
+            text="Modo sin conexión: mapa vectorial (Canvas 2D)",
             font=("Segoe UI", 9, "bold"),
             fill="#94a3b8",
         )
@@ -176,7 +194,10 @@ class CanvasFallback(tk.Canvas):
                     joinstyle=tk.ROUND,
                 )
                 if c["command"]:
+                    self._lineas_clicables.add(line_id)
                     self.tag_bind(line_id, "<Button-1>", lambda e, cam=c: cam["command"](cam))
+                    self.tag_bind(line_id, "<Enter>", lambda e: self.config(cursor="hand2"))
+                    self.tag_bind(line_id, "<Leave>", lambda e: self.config(cursor=""))
 
         # 2. Dibujar marcadores (nodos)
         radio = 7
@@ -206,6 +227,12 @@ class CanvasFallback(tk.Canvas):
             )
             # Etiqueta de texto
             if m["text"]:
+                # Halo blanco detrás del texto para que se lea sobre las calles
+                for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                    self.create_text(
+                        x + dx, y - radio - 7 + dy, text=m["text"],
+                        font=("Segoe UI", 8, "bold"), fill="#f8fafc", tags=tag,
+                    )
                 self.create_text(
                     x,
                     y - radio - 7,

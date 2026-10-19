@@ -3,6 +3,7 @@ Ventana Principal de la Aplicación.
 Gestiona el ciclo de vida de la GUI, carga de datos y las pestañas del sistema.
 """
 
+import traceback
 import tkinter as tk
 from tkinter import ttk, messagebox
 import config
@@ -40,6 +41,52 @@ class AppRutasCusco(tk.Tk):
 
         self._configurar_estilos()
         self._construir_interfaz()
+        self.notebook.bind("<<NotebookTabChanged>>", self._al_cambiar_pestana)
+        self._version_vista = self.grafo.version
+        self.after(700, self._vigilar_cambios)
+
+    def _vigilar_cambios(self):
+        """Mantiene la barra de estado al día cuando se cierra o reabre una calle."""
+        if self.grafo.version != self._version_vista:
+            self._version_vista = self.grafo.version
+            self.mostrar_estado(self._texto_estado_base())
+        self.after(700, self._vigilar_cambios)
+
+    def report_callback_exception(self, tipo, valor, tb):
+        """
+        Cualquier error dentro de un botón llega aquí: se informa en una ventana y la
+        aplicación sigue funcionando, en lugar de fallar en silencio en la consola.
+        """
+        traceback.print_exception(tipo, valor, tb)
+        self.mostrar_estado(f"Error: {valor}")
+        messagebox.showerror(
+            "Operación no completada",
+            f"Ocurrió un error y la operación se canceló:\n\n{tipo.__name__}: {valor}\n\n"
+            "La aplicación sigue funcionando.",
+        )
+
+    def mostrar_estado(self, texto: str):
+        """Escribe un mensaje en la barra de estado inferior."""
+        if hasattr(self, "lbl_status"):
+            self.lbl_status.config(text=texto)
+
+    def _texto_estado_base(self) -> str:
+        cerradas = len(self.grafo.calles_cerradas())
+        return (
+            f"Sistema listo | {len(self.grafo.nodos)} nodos | {len(self.pedidos)} pedidos | "
+            f"{len(self.repartidores)} repartidores | calles cerradas: {cerradas}"
+        )
+
+    def _al_cambiar_pestana(self, _evento=None):
+        """
+        Las pestañas comparten el mismo grafo y la misma lista de pedidos. Al entrar
+        a una pestaña se refrescan sus listas (pedidos nuevos) y su mapa (calles cerradas
+        en otra pestaña), para que nunca muestre datos desactualizados.
+        """
+        actual = self.nametowidget(self.notebook.select())
+        if hasattr(actual, "refrescar"):
+            actual.refrescar()
+        self.mostrar_estado(self._texto_estado_base())
 
     def _configurar_estilos(self):
         self.style = ttk.Style(self)
@@ -94,7 +141,10 @@ class AppRutasCusco(tk.Tk):
 
         # 2. Pestaña Pedidos
         self.tab_pedidos = TabPedidos(
-            self.notebook, pedidos=self.pedidos, grafo=self.grafo
+            self.notebook,
+            pedidos=self.pedidos,
+            grafo=self.grafo,
+            al_informar=self.mostrar_estado,
         )
         self.notebook.add(self.tab_pedidos, text="  📦 Pedidos  ")
 
@@ -109,13 +159,19 @@ class AppRutasCusco(tk.Tk):
 
         # 4. Pestaña Divide y Vencerás
         self.tab_dyv = TabDyV(
-            self.notebook, grafo=self.grafo, pedidos=self.pedidos
+            self.notebook,
+            grafo=self.grafo,
+            pedidos=self.pedidos,
+            repartidores=self.repartidores,
         )
         self.notebook.add(self.tab_dyv, text="  ➗ Divide & Vence  ")
 
         # 5. Pestaña Programación Dinámica
         self.tab_pd = TabPD(
-            self.notebook, grafo=self.grafo, pedidos=self.pedidos
+            self.notebook,
+            grafo=self.grafo,
+            pedidos=self.pedidos,
+            repartidores=self.repartidores,
         )
         self.notebook.add(self.tab_pd, text="  🧠 Prog. Dinámica  ")
 
@@ -135,7 +191,7 @@ class AppRutasCusco(tk.Tk):
 
         self.lbl_status = ttk.Label(
             frame_status,
-            text=f"Sistema Listo | {len(self.grafo.nodos)} Nodos cargados | {len(self.pedidos)} Pedidos | {len(self.repartidores)} Repartidores activos",
+            text=self._texto_estado_base(),
             font=("Segoe UI", 8),
             foreground="#334155",
         )
@@ -152,3 +208,4 @@ class AppRutasCusco(tk.Tk):
     def _al_hacer_clic_mapa(self, coordenadas):
         """Abre un alta de pedido precargada con las coordenadas seleccionadas."""
         self.tab_pedidos.abrir_formulario_alta(coordenadas)
+        self.mostrar_estado(self._texto_estado_base())

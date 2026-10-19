@@ -55,3 +55,40 @@ def test_resolver_rutas_dyv_ensamble(pedidos_dispersos, grafo_minimo):
     assert len(ruta_global.pedidos_cubiertos) == len(pedidos_dispersos)
     assert ruta_global.distancia_total_m > 0.0
     assert ruta_global.secuencia_nodos[0] == "N01"
+
+
+def test_particion_en_r_zonas_exactas(pedidos_dispersos):
+    from core.divide_venceras import particionar_en_r_zonas
+    for r in (1, 2, 3, 4):
+        zonas = particionar_en_r_zonas(pedidos_dispersos, r)
+        assert len(zonas) == r
+        ids = [p.id for z in zonas for p in z]
+        assert sorted(ids) == sorted(p.id for p in pedidos_dispersos)
+        # Zonas balanceadas: tamaños difieren a lo sumo en 1 (6 pedidos / r)
+        tamanios = [len(z) for z in zonas]
+        assert max(tamanios) - min(tamanios) <= 1
+
+
+def test_un_repartidor_por_zona():
+    from core.divide_venceras import resolver_por_repartidores
+    from core.gestor_datos import cargar_grafo, cargar_pedidos, cargar_repartidores
+    grafo = cargar_grafo()
+    pedidos = cargar_pedidos()
+    repartidores = cargar_repartidores()
+    zonas = resolver_por_repartidores(pedidos, repartidores, grafo)
+    assert len(zonas) == len(repartidores)
+    assert {z.repartidor_id for z in zonas} == {r.id for r in repartidores}
+    cubiertos = [pid for z in zonas for pid in z.ruta_local.pedidos_cubiertos]
+    assert sorted(cubiertos) == sorted(p.id for p in pedidos)
+
+
+def test_held_karp_por_zona_no_peor_que_greedy():
+    from core.divide_venceras import ruta_optima_en_zona
+    from core.greedy import vecino_mas_cercano
+    from core.gestor_datos import cargar_grafo, cargar_pedidos
+    grafo = cargar_grafo()
+    pedidos = cargar_pedidos()[:8]
+    exacta = ruta_optima_en_zona("N01", pedidos, grafo)
+    voraz = vecino_mas_cercano("N01", pedidos, grafo)
+    assert exacta.distancia_total_m <= voraz.distancia_total_m + 1e-6
+    assert sorted(exacta.pedidos_cubiertos) == sorted(p.id for p in pedidos)

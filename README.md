@@ -65,6 +65,16 @@ Para correr la suite completa de pruebas automatizadas:
 pytest -v
 ```
 
+### Prueba automática de la interfaz
+Abre la aplicación, pulsa cada funcionalidad de cada pestaña y verifica que no haya errores ni bloqueos (opcionalmente guarda capturas):
+
+```bash
+python tools/prueba_gui.py
+python tools/prueba_gui.py --capturas informe/figuras/gui
+```
+
+Para forzar el mapa vectorial sin conexión: `RUTAS_OFFLINE=1 python main.py` (en PowerShell: `$env:RUTAS_OFFLINE=1; python main.py`).
+
 ### Ejecución de Benchmarks Reales
 Para regenerar las mediciones de rendimiento y exportar a `benchmarks/resultados_benchmark.json`:
 
@@ -110,8 +120,10 @@ rutas_cusco/
 │  ├─ tab_greedy.py             # Planificación voraz y despacho urgente
 │  ├─ tab_dyv.py                # Segmentación espacial en zonas de color y ensamble
 │  ├─ tab_pd.py                 # Matriz visual Mochila 0/1 y Held-Karp vs Greedy en hilo
-│  ├─ tab_backtracking.py       # Exploración de rutas simples con métricas de podas
-│  └─ tab_comparacion.py        # Gráficos Matplotlib incrustados (Tiempo vs N, Calidad vs N)
+│  ├─ tab_backtracking.py       # Todas las rutas simples, poda opcional y cierre de calles
+│  ├─ tab_comparacion.py        # 4 gráficos de benchmarks, tabla Big-O y conclusiones
+│  ├─ hilos.py                  # Cálculos en segundo plano sin tocar Tkinter desde otro hilo
+│  └─ panel_desplazable.py      # Paneles laterales con scroll (pantallas 1366x768)
 │
 ├─ benchmarks/
 │  ├─ benchmark.py              # Suite de medición empírica de tiempos y calidad
@@ -119,7 +131,8 @@ rutas_cusco/
 │
 ├─ tools/
 │  ├─ construir_red_vial.py     # Descarga OSM y genera el cache offline (solo desarrollo)
-│  └─ verificar_red_vial.py     # Tabla de desvíos y PNG de polilíneas
+│  ├─ verificar_red_vial.py     # Tabla de desvíos y PNG de polilíneas
+│  └─ prueba_gui.py             # Prueba automática de todas las funciones de la GUI
 │
 ├─ tests/                       # Pruebas unitarias, de Dijkstra y del cache vial
 │  ├─ test_estructuras.py       # Pruebas de MergeSort, QuickSort y búsquedas
@@ -144,11 +157,12 @@ rutas_cusco/
 | **Estructuras** | Quick Sort | $O(n \log n)$ prom | $O(\log n)$ | Partición Lomuto con mediana de 3 |
 | **Estructuras** | Búsqueda Binaria | $O(\log n)$ | $O(1)$ | Búsqueda sobre lista ordenada |
 | **Greedy** | Vecino Cercano | $O(n^2)$ | $O(n)$ | Heurística voraz para TSP |
-| **Greedy** | Asignación Urgente | $O(R) \to O(1)$ | $O(1)$ | Mínima distancia con capacidad |
-| **Divide y Vence** | Partición Espacial 2D | $O(n \log n)$ | $O(n)$ | Mediana alternada, Teorema Maestro Caso 2 |
-| **Prog. Dinámica** | Mochila 0/1 | $O(N \cdot W)$ | $O(N \cdot W)$ | Matriz DP bidimensional y reconstrucción |
+| **Greedy** | Asignación Urgente | $O(R)$ | $O(1)$ | Mínima distancia con capacidad |
+| **Divide y Vence** | Partición en zonas de K | $\Theta(n \log^2 n)$ | $O(n)$ | Mediana alternada (ordena con Quick Sort en cada nivel) |
+| **Divide y Vence** | Una zona por repartidor | $\Theta(n \log n \log R)$ | $O(n)$ | R zonas; cada repartidor resuelve la suya con Held-Karp |
+| **Prog. Dinámica** | Mochila 0/1 | $O(N \cdot W)$ | $O(N \cdot W)$ | W en décimas de kg; nunca excede la capacidad |
 | **Prog. Dinámica** | Held-Karp TSP | $O(n^2 2^n)$ | $O(n 2^n)$ | Bitmask y memoización para $N \le 12$ |
-| **Backtracking** | Rutas con Poda | $O(V!)$ podado | $O(V)$ | Poda Branch & Bound por costo parcial |
+| **Backtracking** | Todas las rutas simples | $O(b^d)$, peor $O(V \cdot V!)$ | $O(V)$ | Poda Branch & Bound opcional (misma óptima, menos estados) |
 
 ## Verificación de rutas por calles
 

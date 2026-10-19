@@ -30,6 +30,7 @@ def buscar_rutas_backtracking(
     destino_id: str,
     max_rutas: int = 500,
     timeout_seg: float = 5.0,
+    usar_poda: bool = True,
 ) -> ResultadoBacktracking:
     """
     Explora exhaustivamente todos los caminos simples entre origen y destino
@@ -41,19 +42,32 @@ def buscar_rutas_backtracking(
           Si el costo acumulado ya supera o iguala la distancia de la mejor ruta
           encontrada hasta el momento, se poda la rama inmediatamente (corte).
 
+    Dos modos (parámetro usar_poda):
+      - usar_poda=False: búsqueda exhaustiva pura. Enumera TODOS los caminos simples
+        (lo que pide literalmente el enunciado) y al final elige el más corto.
+      - usar_poda=True (Branch & Bound): descarta una rama en cuanto su costo parcial
+        iguala o supera la mejor ruta completa ya encontrada. Como los pesos son
+        no negativos, el costo de una rama solo puede crecer al extenderla, así que una
+        rama podada nunca puede terminar en una ruta más corta: la óptima se conserva.
+        A cambio, rutas_encontradas solo contiene las rutas que fueron mejorando la cota.
+
     Complejidad Temporal:
-      - Peor caso teórico (grafo completo sin podas): O(V!).
-      - Caso promedio con poda y grafo disperso (grado 2-4): O(b^d), donde b es el factor
-        de ramificación efectivo reducido drásticamente por la poda Branch & Bound.
-    
+      - Peor caso (grafo completo, sin poda): O(V!) caminos simples, cada uno de
+        longitud O(V) al copiarlo -> O(V · V!).
+      - Grafo disperso de grado medio b y caminos de largo d: O(b^d). La poda no cambia
+        la cota del peor caso, pero reduce los estados visitados en la práctica
+        (ver total_estados_visitados con y sin poda).
+
     Complejidad Espacial:
-      - O(V) espacio de memoria en la pila de llamadas de recursión y conjunto de visitados.
+      - O(V) para la pila de recursión, el camino actual y el conjunto de visitados,
+        más O(R · V) para guardar las R rutas encontradas.
 
     :param grafo: Grafo vial de Cusco.
     :param origen_id: ID del nodo inicial.
     :param destino_id: ID del nodo destino.
     :param max_rutas: Tope de seguridad de soluciones registradas.
     :param timeout_seg: Tiempo máximo de cálculo en segundos.
+    :param usar_poda: True activa la poda por cota (Branch & Bound).
     :return: ResultadoBacktracking con caminos, ruta óptima y métricas.
     """
     t_inicio = time.perf_counter()
@@ -85,7 +99,7 @@ def buscar_rutas_backtracking(
             return
 
         # PODA POR COTA: Si el camino parcial ya supera a la mejor ruta conocida
-        if costo_acumulado >= mejor_distancia:
+        if usar_poda and costo_acumulado >= mejor_distancia:
             contador_podas += 1
             return
 

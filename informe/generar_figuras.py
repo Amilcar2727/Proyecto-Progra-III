@@ -1,12 +1,13 @@
 """
 Generador de Figuras para el Informe Técnico.
 Usa los datos reales de benchmarks/resultados_benchmark.json para producir
-3 PNGs de alta resolución en informe/figuras/.
+4 PNGs de alta resolución en informe/figuras/.
 
 Figuras generadas:
   fig1_tiempo_vs_n.png   — Tiempo de ejecución (ms) vs n en escala log
   fig2_calidad_ruta.png  — Distancia Greedy vs Held-Karp + Gap %
-  fig3_backtracking.png  — Rutas encontradas, ramas podadas y estados visitados
+  fig3_backtracking.png  — Backtracking con y sin poda: estados y rutas
+  fig4_mochila_dyv.png   — Mochila PD vs voraz y D&C por repartidor
 """
 
 import json
@@ -79,7 +80,7 @@ ax1.semilogy(n_ref, ref_hk, "--", color=C_HK, lw=1.2, alpha=0.55,
 
 ax1.set_xlabel("Número de pedidos activos (n)")
 ax1.set_ylabel("Tiempo de ejecución (ms) — escala log")
-ax1.set_title("Figura 1. Tiempo de ejecución: Greedy vs Held-Karp (TSP)")
+ax1.set_title("Tiempo de ejecución: Greedy vs Held-Karp (TSP)")
 ax1.set_xticks(n_tsp)
 ax1.grid(True, which="both", linestyle=":", alpha=GRID_ALPHA)
 ax1.legend(framealpha=0.9, loc="upper left")
@@ -148,7 +149,7 @@ for bar, g_val in zip(bars_gap, gap):
     ax2b.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.2,
               f"{g_val:.1f}%", ha="center", va="bottom", fontsize=9)
 
-fig2.suptitle("Figura 2. Comparación de calidad de ruta: Greedy vs Held-Karp",
+fig2.suptitle("Comparación de calidad de ruta: Greedy vs Held-Karp",
               fontsize=13, fontweight="bold")
 fig2.tight_layout()
 out2 = FIGURAS_DIR / "fig2_calidad_ruta.png"
@@ -157,71 +158,74 @@ plt.close(fig2)
 print(f"[OK] {out2}")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# FIGURA 3 — Backtracking: rutas encontradas, ramas podadas, estados visitados
+# FIGURA 3 — Backtracking: búsqueda exhaustiva sin poda vs con poda
 # ══════════════════════════════════════════════════════════════════════════════
-bt_casos    = data["backtracking"]["casos_backtracking"]
-descrips    = [c["descripcion"].split("(")[1].rstrip(")") for c in bt_casos]
-rutas_enc   = [c["rutas_encontradas"]    for c in bt_casos]
-ramas_pod   = [c["ramas_podadas"]         for c in bt_casos]
-estados_vis = [c["estados_visitados"]     for c in bt_casos]
-tiempos_bt  = [c["tiempo_ms"]             for c in bt_casos]
+bt_casos  = data["backtracking"]["casos_backtracking"]
+etiquetas = [c["par"].replace(" -> ", "→") for c in bt_casos]
+est_sin   = [c["estados_visitados_sin_poda"] for c in bt_casos]
+est_con   = [c["estados_visitados"] for c in bt_casos]
+rut_sin   = [c["rutas_totales_sin_poda"] for c in bt_casos]
+rut_con   = [c["rutas_encontradas"] for c in bt_casos]
 
 x3    = np.arange(len(bt_casos))
-width = 0.28
-
+width = 0.36
 fig3, (ax3a, ax3b) = plt.subplots(1, 2, figsize=(12, 5))
 
-# — Panel izquierdo: barras agrupadas (ramas y estados)
-b_ramas = ax3a.bar(x3 - width/2, ramas_pod, width, label="Ramas podadas",
-                   color=C_BT_RAMAS, alpha=0.85)
-b_estad = ax3a.bar(x3 + width/2, estados_vis, width, label="Estados visitados",
-                   color=C_BT_EST, alpha=0.85)
-ax3a.set_xticks(x3)
-ax3a.set_xticklabels(descrips, fontsize=9)
-ax3a.set_ylabel("Cantidad")
-ax3a.set_title("Efectividad de la poda en Backtracking")
-ax3a.legend()
-ax3a.grid(axis="y", linestyle=":", alpha=GRID_ALPHA)
+for ax, sin, con, titulo, ylabel in (
+    (ax3a, est_sin, est_con, "Estados visitados", "Estados (llamadas recursivas)"),
+    (ax3b, rut_sin, rut_con, "Rutas registradas", "Rutas"),
+):
+    b1 = ax.bar(x3 - width / 2, sin, width, label="Sin poda (exhaustivo)", color=C_BT_RUTAS, alpha=0.85)
+    b2 = ax.bar(x3 + width / 2, con, width, label="Con poda (Branch & Bound)", color=C_BT_RAMAS, alpha=0.85)
+    ax.set_xticks(x3)
+    ax.set_xticklabels(etiquetas, fontsize=9)
+    ax.set_ylabel(ylabel)
+    ax.set_title(titulo)
+    ax.grid(axis="y", linestyle=":", alpha=GRID_ALPHA)
+    ax.legend(fontsize=9)
+    for barra in list(b1) + list(b2):
+        h = barra.get_height()
+        ax.text(barra.get_x() + barra.get_width() / 2, h, str(int(h)),
+                ha="center", va="bottom", fontsize=8)
 
-for bar in b_ramas:
-    h = bar.get_height()
-    ax3a.text(bar.get_x() + bar.get_width()/2, h + 3,
-              str(int(h)), ha="center", va="bottom", fontsize=8)
-for bar in b_estad:
-    h = bar.get_height()
-    ax3a.text(bar.get_x() + bar.get_width()/2, h + 3,
-              str(int(h)), ha="center", va="bottom", fontsize=8)
-
-# — Panel derecho: rutas encontradas y tiempo de ejecución en eje secundario
-ax3b_twin = ax3b.twinx()
-b_rutas = ax3b.bar(x3, rutas_enc, 0.5, color=C_BT_RUTAS, alpha=0.80,
-                   label="Rutas encontradas")
-line_t  = ax3b_twin.plot(x3, tiempos_bt, "D--", color="#333333", lw=1.8,
-                         markersize=7, label="Tiempo (ms)")
-ax3b.set_xticks(x3)
-ax3b.set_xticklabels(descrips, fontsize=9)
-ax3b.set_ylabel("Rutas alternativas encontradas")
-ax3b_twin.set_ylabel("Tiempo de ejecución (ms)")
-ax3b.set_title("Rutas encontradas y tiempo de cómputo")
-ax3b.set_ylim(0, max(rutas_enc) * 1.5)
-ax3b_twin.set_ylim(0, max(tiempos_bt) * 1.6)
-
-# Combinar leyendas
-handles1, labels1 = ax3b.get_legend_handles_labels()
-handles2, labels2 = ax3b_twin.get_legend_handles_labels()
-ax3b.legend(handles1 + handles2, labels1 + labels2, loc="upper left", fontsize=9)
-ax3b.grid(axis="y", linestyle=":", alpha=GRID_ALPHA)
-
-for bar, rv in zip(b_rutas, rutas_enc):
-    ax3b.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1,
-              str(rv), ha="center", va="bottom", fontsize=9, fontweight="bold")
-
-fig3.suptitle("Figura 3. Rendimiento del algoritmo Backtracking con poda",
+fig3.suptitle("Backtracking con y sin poda (misma ruta óptima en todos los casos)",
               fontsize=13, fontweight="bold")
 fig3.tight_layout()
 out3 = FIGURAS_DIR / "fig3_backtracking.png"
 fig3.savefig(out3, dpi=300, bbox_inches="tight")
 plt.close(fig3)
 print(f"[OK] {out3}")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FIGURA 4 — Mochila PD vs voraz y Divide y Vencerás por repartidor
+# ══════════════════════════════════════════════════════════════════════════════
+moch = data["mochila"]
+zon  = data["zonas_repartidores"]
+fig4, (ax4a, ax4b) = plt.subplots(1, 2, figsize=(12, 4.8))
+
+ax4a.plot(moch["n"], moch["valor_pd"], "s-", color=C_HK, lw=2.2, label="Mochila 0/1 por PD (óptimo)")
+ax4a.plot(moch["n"], moch["valor_voraz"], "o--", color=C_GREEDY, lw=1.8, label="Greedy por valor/kg")
+ax4a.set_xlabel("Pedidos considerados (N)")
+ax4a.set_ylabel("Valor cargado (S/.)")
+ax4a.set_title(f"Mochila con capacidad {moch['capacidad_kg']:g} kg")
+ax4a.grid(True, linestyle=":", alpha=GRID_ALPHA)
+ax4a.legend()
+
+nombres = [f"Zona {z['zona']}\n{z['repartidor']}" for z in zon["zonas"]] + ["1 repartidor\nGreedy"]
+valores = [z["distancia_m"] / 1000 for z in zon["zonas"]] + [zon["un_repartidor_greedy_m"] / 1000]
+colores = [C_MERGE] * len(zon["zonas"]) + [C_GREEDY]
+barras = ax4b.bar(nombres, valores, color=colores, alpha=0.85)
+for barra, v in zip(barras, valores):
+    ax4b.text(barra.get_x() + barra.get_width() / 2, v, f"{v:.1f}", ha="center", va="bottom", fontsize=9)
+ax4b.set_ylabel("Distancia de la ruta (km)")
+ax4b.set_title("D&C: una zona por repartidor vs un solo repartidor")
+ax4b.grid(axis="y", linestyle=":", alpha=GRID_ALPHA)
+
+fig4.suptitle("Programación Dinámica y Divide y Vencerás", fontsize=13, fontweight="bold")
+fig4.tight_layout()
+out4 = FIGURAS_DIR / "fig4_mochila_dyv.png"
+fig4.savefig(out4, dpi=300, bbox_inches="tight")
+plt.close(fig4)
+print(f"[OK] {out4}")
 
 print("\nTodas las figuras generadas exitosamente en:", FIGURAS_DIR)

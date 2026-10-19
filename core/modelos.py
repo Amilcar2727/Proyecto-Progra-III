@@ -88,10 +88,25 @@ class Grafo:
         self.adyacencia: Dict[str, Dict[str, Arista]] = {}
         self.matriz_distancias: Optional[Dict[str, Dict[str, float]]] = None
         self.caminos_minimos: Optional[Dict[str, Dict[str, List[str]]]] = None
+        # Aumenta con cada cambio (nodo, arista, calle cerrada); la GUI lo usa para
+        # saber si debe redibujar un mapa que quedó desactualizado.
+        self.version: int = 0
 
     def _invalidar_cache_distancias(self) -> None:
         self.matriz_distancias = None
         self.caminos_minimos = None
+        self.version += 1
+
+    def calles_cerradas(self) -> List[Tuple[str, str]]:
+        """Pares (u, v) cerrados, contando una sola vez cada calle de doble sentido."""
+        cerradas: List[Tuple[str, str]] = []
+        vistos = set()
+        for u, vecinos in self.adyacencia.items():
+            for v, arista in vecinos.items():
+                if not arista.activa and (v, u) not in vistos:
+                    cerradas.append((u, v))
+                    vistos.add((u, v))
+        return cerradas
 
     def agregar_nodo(self, nodo: Nodo) -> None:
         """Agrega un nodo al grafo e inicializa su lista de adyacencia."""
